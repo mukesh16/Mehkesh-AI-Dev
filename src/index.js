@@ -190,10 +190,15 @@ function resolveModel({ hasImage, prompt, override }) {
 }
 
 // ============================================================================
-// Daily Briefing Generation (Edge Cron Trigger)
+// Daily Briefing Generation (Edge Cron Trigger & Per-User Isolation)
 // ============================================================================
-async function generateDailyBriefing(env) {
+async function generateDailyBriefing(env, user = null) {
   const today = new Date().toISOString().split("T")[0];
+  const isMaster = !user || user.role === "admin" || user.id === "usr_master";
+  const targetUserId = isMaster ? "usr_master" : user.id;
+  const targetName = isMaster ? "Mehkesh" : (user.full_name || "there");
+  const briefingDateKey = isMaster ? today : (user.id + "_" + today);
+
   let recentMsgs = [];
   let memories = [];
   let neuronsYesterday = 0;
@@ -202,14 +207,14 @@ async function generateDailyBriefing(env) {
     try {
       const [msgsRes, memRes, neuronRes] = await Promise.all([
         env.DB.prepare(
-          "SELECT role, content FROM messages WHERE created_at >= DATETIME('now', '-24 hours') ORDER BY created_at ASC LIMIT 30"
-        ).all(),
+          "SELECT role, content FROM messages WHERE user_id = ? AND created_at >= DATETIME('now', '-24 hours') ORDER BY created_at ASC LIMIT 30"
+        ).bind(targetUserId).all(),
         env.DB.prepare(
-          "SELECT fact FROM memories WHERE user_id = 'usr_master' ORDER BY created_at DESC LIMIT 8"
-        ).all(),
+          "SELECT fact FROM memories WHERE user_id = ? ORDER BY created_at DESC LIMIT 8"
+        ).bind(targetUserId).all(),
         env.DB.prepare(
-          "SELECT SUM(approx_neurons) as total FROM activity_logs WHERE created_at >= DATETIME('now', '-24 hours')"
-        ).first(),
+          "SELECT SUM(approx_neurons) as total FROM activity_logs WHERE user_id = ? AND created_at >= DATETIME('now', '-24 hours')"
+        ).bind(targetUserId).first(),
       ]);
       recentMsgs = msgsRes?.results || [];
       memories = memRes?.results || [];
@@ -220,9 +225,10 @@ async function generateDailyBriefing(env) {
   }
 
   const conversationSummary = recentMsgs.map((m) => `${m.role}: ${m.content.slice(0, 200)}`).join("\n") || "No recent activity recorded.";
-  const memoryList = memories.map((m) => "- " + m.fact).join("\n") || "- Master of the system.";
+  const memoryList = memories.map((m) => "- " + m.fact).join("\n") || (isMaster ? "- Master of the system." : "- AI User.");
 
-  const briefingPrompt = `You are Mehkesh AI, the personal AI assistant for Mehkesh.
+  const briefingPrompt = isMaster
+    ? `You are Mehkesh AI, the personal AI assistant for Mehkesh.
 Generate a concise, motivating morning briefing for ${today}.
 Context of recent interactions:
 ${conversationSummary.slice(0, 1500)}
@@ -234,7 +240,20 @@ Structure:
 1. Executive Greeting: A crisp greeting addressing Mehkesh.
 2. Yesterday's Recap: 2-3 brief bullet points of what we explored, coded, or discussed.
 3. Today's Strategic Focus: 2 actionable focus areas or pending tasks.
-Keep it sharp, witty, and under 200 words.`;
+Keep it sharp, witty, and under 200 words.`
+    : `You are Mehkesh AI, an intelligent, helpful AI assistant for ${targetName}.
+Generate a concise, positive morning briefing for ${today}.
+Context of recent interactions with ${targetName}:
+${conversationSummary.slice(0, 1500)}
+
+User preferences & notes:
+${memoryList}
+
+Structure:
+1. Friendly Greeting: A warm greeting addressing ${targetName}.
+2. Yesterday's Highlights: 2 brief bullet points of topics explored or discussed (or an inspiring note if starting fresh).
+3. Today's Focus: 2 constructive suggestions or focus areas.
+Keep it encouraging, clean, professional, and under 180 words. Do NOT mention any admin, system master, or internal architecture details.`;
 
   let summary = "";
   try {
@@ -242,14 +261,14 @@ Keep it sharp, witty, and under 200 words.`;
       messages: [{ role: "user", content: briefingPrompt }],
       max_tokens: 512,
     });
-    summary = aiRes.response || "Good morning, Mehkesh. All dev edge systems are operating normally. Standing by for today's objectives.";
+    summary = aiRes.response || `Good morning, ${targetName}. All edge systems are online. Ready when you are.`;
   } catch (err) {
-    summary = `Good morning, Mehkesh. Systems are online for ${today}. Ready when you are.`;
+    summary = `Good morning, ${targetName}. Systems are online for ${today}. Ready when you are.`;
   }
 
   if (env.DB) {
     try {
-      const briefId = "brief_" + today;
+      const briefId = "brief_" + briefingDateKey;
       const now = Date.now();
       const insertBriefingStmt = env.DB.prepare(`
         INSERT INTO daily_briefings (id, briefing_date, summary, pending_tasks, neurons_yesterday)
@@ -258,15 +277,15 @@ Keep it sharp, witty, and under 200 words.`;
           summary = excluded.summary,
           neurons_yesterday = excluded.neurons_yesterday,
           created_at = CURRENT_TIMESTAMP
-      `).bind(briefId, today, summary, "Review today's goals and active projects.", neuronsYesterday);
+      `).bind(briefId, briefingDateKey, summary, "Review today's goals and active projects.", neuronsYesterday);
 
       const pruneLogsStmt = env.DB.prepare(
         "DELETE FROM activity_logs WHERE created_at < DATETIME('now', '-90 days')"
       );
 
       const logStmt = env.DB.prepare(
-        "INSERT INTO activity_logs (id, user_id, action_type, model_used, approx_neurons) VALUES (?, 'usr_master', ?, ?, ?)"
-      ).bind("log_" + now, "daily_briefing", MODELS.GENERAL, 80);
+        "INSERT INTO activity_logs (id, user_id, action_type, model_used, approx_neurons) VALUES (?, ?, 'daily_briefing', ?, ?)"
+      ).bind("log_" + now, targetUserId, MODELS.GENERAL, 80);
 
       if (typeof env.DB.batch === "function") {
         await env.DB.batch([insertBriefingStmt, pruneLogsStmt, logStmt]);
@@ -472,14 +491,12 @@ export default {
       });
     }
 
-    // 2. Serve Brand Logo SVG & Favicon
-    if (method === "GET" && (pathname === "/logo.svg" || pathname === "/favicon.ico")) {
-      return new Response(BRAND_LOGO_SVG, {
-        headers: {
-          "Content-Type": "image/svg+xml",
-          "Cache-Control": "public, max-age=86400",
-        },
-      });
+    // 2. Serve Exact Brand Favicon & Logo
+    if (method === "GET" && (pathname === "/favicon.ico" || pathname === "/logo.svg")) {
+      if (env.ASSETS) {
+        return env.ASSETS.fetch(new Request(new URL("/logo.png", request.url), request));
+      }
+      return Response.redirect(new URL("/logo.png", request.url).toString(), 302);
     }
 
     // 3. Health & Status Check
@@ -752,25 +769,26 @@ export default {
           try {
             const sessions = await env.DB.prepare(`
               SELECT s.*, 
-                (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.id AND m.user_id = s.user_id) as message_count,
-                (SELECT content FROM messages m WHERE m.session_id = s.id AND m.user_id = s.user_id ORDER BY m.created_at DESC LIMIT 1) as last_message
+                (SELECT COUNT(*) FROM messages m WHERE m.session_id = s.id) as message_count,
+                (SELECT content FROM messages m WHERE m.session_id = s.id ORDER BY m.created_at DESC LIMIT 1) as last_message
               FROM sessions s
               WHERE s.user_id = ?
               ORDER BY s.updated_at DESC
-              LIMIT 50
+              LIMIT 60
             `).bind(currentUserId).all();
             return jsonResponse(sessions?.results || []);
           } catch (e) {
+            console.error("GET /api/sessions error:", e);
             return jsonResponse([]);
           }
         }
 
         if (method === "POST") {
           const body = await request.json().catch(() => ({}));
-          const id = "sess_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
-          const title = (body.title || "New Session").slice(0, 80).trim();
+          const id = body.id || ("sess_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6));
+          const title = (body.title || "New Chat").slice(0, 80).trim();
           await env.DB.prepare(
-            "INSERT INTO sessions (id, user_id, title) VALUES (?, ?, ?)"
+            "INSERT INTO sessions (id, user_id, title, created_at, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)"
           ).bind(id, currentUserId, title).run();
           return jsonResponse({ id, title, created_at: new Date().toISOString() });
         }
@@ -809,20 +827,23 @@ export default {
       }
 
       // ----------------------------------------------------------------------
-      // Daily Briefing Endpoint
+      // Daily Briefing Endpoint (User-Personalized & Isolated)
       // ----------------------------------------------------------------------
       if (pathname === "/api/briefing/today") {
         const today = new Date().toISOString().split("T")[0];
+        const isMaster = user.role === "admin" || user.id === "usr_master";
+        const briefingDateKey = isMaster ? today : (currentUserId + "_" + today);
+
         if (env.DB) {
-          const existing = await env.DB.prepare("SELECT * FROM daily_briefings WHERE briefing_date = ?").bind(today).first();
+          const existing = await env.DB.prepare("SELECT * FROM daily_briefings WHERE briefing_date = ?").bind(briefingDateKey).first();
           if (existing) return jsonResponse(existing);
         }
-        const generated = await generateDailyBriefing(env);
+        const generated = await generateDailyBriefing(env, user);
         return jsonResponse(generated);
       }
 
       if (pathname === "/api/briefing/refresh" && method === "POST") {
-        const generated = await generateDailyBriefing(env);
+        const generated = await generateDailyBriefing(env, user);
         return jsonResponse({ ok: true, briefing: generated });
       }
 
@@ -924,11 +945,44 @@ export default {
 
         try {
           const res = await env.AI.run(MODELS.IMAGE_GEN, { prompt, steps: 4 });
+          const sessionId = body.session_id;
+
           if (env.DB) {
             ctx.waitUntil(
-              env.DB.prepare(
-                "INSERT INTO activity_logs (id, user_id, action_type, model_used, approx_neurons) VALUES (?, ?, ?, ?, ?)"
-              ).bind("log_" + Date.now(), currentUserId, "imagine", MODELS.IMAGE_GEN, 100).run().catch(() => {})
+              (async () => {
+                const now = Date.now();
+                const logStmt = env.DB.prepare(
+                  "INSERT INTO activity_logs (id, user_id, action_type, model_used, approx_neurons) VALUES (?, ?, ?, ?, ?)"
+                ).bind("log_" + now, currentUserId, "imagine", MODELS.IMAGE_GEN, 100);
+
+                if (sessionId) {
+                  const ensureSess = env.DB.prepare(`
+                    INSERT INTO sessions (id, user_id, title, created_at, updated_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT(id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+                  `).bind(sessionId, currentUserId, ("🎨 " + prompt).slice(0, 40));
+
+                  const userMsg = env.DB.prepare(
+                    "INSERT INTO messages (id, session_id, user_id, role, content, model_used, has_media) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                  ).bind("msg_" + now + "_1_u", sessionId, currentUserId, "user", "/imagine " + prompt, MODELS.IMAGE_GEN, 0);
+
+                  const imgDataUrl = res.image ? `![${prompt}](data:image/jpeg;base64,${res.image})` : "[Image Generated]";
+                  const asstMsg = env.DB.prepare(
+                    "INSERT INTO messages (id, session_id, user_id, role, content, model_used, has_media) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                  ).bind("msg_" + now + "_2_a", sessionId, currentUserId, "assistant", imgDataUrl, MODELS.IMAGE_GEN, 1);
+
+                  if (typeof env.DB.batch === "function") {
+                    await env.DB.batch([logStmt, ensureSess, userMsg, asstMsg]).catch(() => {});
+                  } else {
+                    await logStmt.run().catch(() => {});
+                    await ensureSess.run().catch(() => {});
+                    await userMsg.run().catch(() => {});
+                    await asstMsg.run().catch(() => {});
+                  }
+                } else {
+                  await logStmt.run().catch(() => {});
+                }
+              })()
             );
           }
           if (res.image) {
@@ -1038,15 +1092,48 @@ export default {
             target_lang: targetLang,
           });
 
+          const sessionId = body.session_id;
+          const translatedResult = res.translation || res.translated_text || String(res);
+
           if (env.DB) {
             ctx.waitUntil(
-              env.DB.prepare(
-                "INSERT INTO activity_logs (id, user_id, action_type, model_used, approx_neurons) VALUES (?, ?, ?, ?, ?)"
-              ).bind("log_" + Date.now(), currentUserId, "translate", MODELS.TRANSLATE, 15).run().catch(() => {})
+              (async () => {
+                const now = Date.now();
+                const logStmt = env.DB.prepare(
+                  "INSERT INTO activity_logs (id, user_id, action_type, model_used, approx_neurons) VALUES (?, ?, ?, ?, ?)"
+                ).bind("log_" + now, currentUserId, "translate", MODELS.TRANSLATE, 15);
+
+                if (sessionId) {
+                  const ensureSess = env.DB.prepare(`
+                    INSERT INTO sessions (id, user_id, title, created_at, updated_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT(id) DO UPDATE SET updated_at = CURRENT_TIMESTAMP
+                  `).bind(sessionId, currentUserId, ("🌐 " + text).slice(0, 40));
+
+                  const userMsg = env.DB.prepare(
+                    "INSERT INTO messages (id, session_id, user_id, role, content, model_used, has_media) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                  ).bind("msg_" + now + "_1_u", sessionId, currentUserId, "user", "/translate " + text, MODELS.TRANSLATE, 0);
+
+                  const asstMsg = env.DB.prepare(
+                    "INSERT INTO messages (id, session_id, user_id, role, content, model_used, has_media) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                  ).bind("msg_" + now + "_2_a", sessionId, currentUserId, "assistant", translatedResult, MODELS.TRANSLATE, 0);
+
+                  if (typeof env.DB.batch === "function") {
+                    await env.DB.batch([logStmt, ensureSess, userMsg, asstMsg]).catch(() => {});
+                  } else {
+                    await logStmt.run().catch(() => {});
+                    await ensureSess.run().catch(() => {});
+                    await userMsg.run().catch(() => {});
+                    await asstMsg.run().catch(() => {});
+                  }
+                } else {
+                  await logStmt.run().catch(() => {});
+                }
+              })()
             );
           }
 
-          return jsonResponse({ translation: res.translation || res.translated_text || res });
+          return jsonResponse({ translation: translatedResult });
         } catch (err) {
           return jsonResponse({ error: "Translation failed: " + err.message }, 500);
         }
@@ -1181,6 +1268,17 @@ Always maintain the prestigious persona of Mehkesh AI. When providing code or te
 
                 if (env.DB && session_id) {
                   const now = Date.now();
+                  const autoTitle = latestUserMessage.slice(0, 40).trim() || "New Chat";
+
+                  // Ensure session exists and update timestamp & title
+                  const ensureSess = env.DB.prepare(`
+                    INSERT INTO sessions (id, user_id, title, created_at, updated_at)
+                    VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                    ON CONFLICT(id) DO UPDATE SET
+                      updated_at = CURRENT_TIMESTAMP,
+                      title = CASE WHEN title = 'New Chat' OR title = 'New Session' THEN excluded.title ELSE title END
+                  `).bind(session_id, currentUserId, autoTitle);
+
                   const insertUser = env.DB.prepare(
                     "INSERT INTO messages (id, session_id, user_id, role, content, model_used, has_media) VALUES (?, ?, ?, ?, ?, ?, ?)"
                   ).bind("msg_" + now + "_u", session_id, currentUserId, "user", latestUserMessage, chosenModel, has_image ? 1 : 0);
@@ -1189,20 +1287,16 @@ Always maintain the prestigious persona of Mehkesh AI. When providing code or te
                     "INSERT INTO messages (id, session_id, user_id, role, content, model_used, has_media) VALUES (?, ?, ?, ?, ?, ?, ?)"
                   ).bind("msg_" + (now + 1) + "_a", session_id, currentUserId, "assistant", accumulatedResponse, chosenModel, 0);
 
-                  const updateSess = env.DB.prepare(
-                    "UPDATE sessions SET updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?"
-                  ).bind(session_id, currentUserId);
-
                   const logChat = env.DB.prepare(
                     "INSERT INTO activity_logs (id, user_id, action_type, model_used, approx_neurons) VALUES (?, ?, ?, ?, ?)"
                   ).bind("log_" + now, currentUserId, "chat", chosenModel, 65);
 
                   if (typeof env.DB.batch === "function") {
-                    await env.DB.batch([insertUser, insertAssistant, updateSess, logChat]);
+                    await env.DB.batch([ensureSess, insertUser, insertAssistant, logChat]);
                   } else {
+                    await ensureSess.run();
                     await insertUser.run();
                     await insertAssistant.run();
-                    await updateSess.run();
                     await logChat.run();
                   }
 

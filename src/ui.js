@@ -11,8 +11,10 @@ export function getHTML(env = {}) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>${appName}</title>
   <meta name="description" content="Mehkesh AI - A Production-Grade Multi-Model Personal AI Assistant at the Cloudflare Edge">
-  <link rel="icon" type="image/svg+xml" href="/logo.svg">
-  <link rel="alternate icon" type="image/png" href="/logo.png">
+  <!-- Exact Brand Favicon -->
+  <link rel="icon" type="image/png" href="/logo.png">
+  <link rel="shortcut icon" type="image/png" href="/logo.png">
+  <link rel="apple-touch-icon" href="/logo.png">
 
   <!-- Highlight.js, Marked, DOMPurify (100% Free Edge CDN) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
@@ -21,7 +23,7 @@ export function getHTML(env = {}) {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.2/purify.min.js"></script>
 
   <!-- Google Identity Services (GSI) for Google Sign-in / Sign-up -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://accounts.google.com/gsi/client" async defer onload="if(typeof initGoogleSignIn==='function')initGoogleSignIn()"></script>
 
   <style>
     :root {
@@ -774,6 +776,111 @@ export function getHTML(env = {}) {
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     }
 
+    .briefing-rendered-content p { margin-bottom: 12px; }
+    .briefing-rendered-content strong { color: #fff; font-weight: 700; }
+    .briefing-rendered-content ol, .briefing-rendered-content ul { margin: 8px 0 14px 22px; }
+    .briefing-rendered-content li { margin-bottom: 6px; }
+
+    /* Typing Dots Animation */
+    .typing-dots {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 6px;
+    }
+    .typing-dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--purple);
+      display: inline-block;
+      animation: typingPulse 1.4s infinite ease-in-out both;
+    }
+    .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes typingPulse {
+      0%, 80%, 100% { transform: scale(0.4); opacity: 0.3; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Pre Code Block & Copy Button */
+    pre {
+      position: relative;
+      background: #090c14 !important;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 10px;
+      padding: 14px 16px;
+      margin: 12px 0;
+      overflow-x: auto;
+    }
+    pre code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.88rem;
+      background: transparent !important;
+      padding: 0 !important;
+    }
+    .copy-code-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #94a3b8;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 4px 9px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .copy-code-btn:hover {
+      background: var(--purple);
+      color: #fff;
+    }
+    .copy-code-btn.copied {
+      background: var(--green);
+      color: #000;
+      border-color: var(--green);
+    }
+
+    /* Attachment Preview Bar */
+    .attachment-preview-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      background: rgba(124, 58, 237, 0.16);
+      border: 1px solid rgba(124, 58, 237, 0.35);
+      border-radius: 14px;
+      font-size: 0.78rem;
+      color: #c084fc;
+      width: fit-content;
+      margin-bottom: 6px;
+      backdrop-filter: blur(8px);
+    }
+
+    .google-custom-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      width: 280px;
+      padding: 10px 16px;
+      background: #1a73e8;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 24px;
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      box-shadow: 0 4px 14px rgba(26, 115, 232, 0.4);
+    }
+    .google-custom-btn:hover {
+      background: #1557b0;
+      transform: translateY(-1px);
+    }
+
     @keyframes fadeIn {
       from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
@@ -794,7 +901,7 @@ export function getHTML(env = {}) {
   <!-- Left Sidebar -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <div class="logo-container" onclick="resetToHero()">
+      <div class="logo-container" onclick="startNewChat()">
         <img src="/logo.png" alt="Mehkesh AI" class="brand-logo-img" onerror="this.onerror=null; this.src='/logo.svg';">
         <span>Mehkesh AI</span>
         <span class="logo-badge">DEV</span>
@@ -809,7 +916,7 @@ export function getHTML(env = {}) {
 
     <!-- Sidebar Navigation -->
     <nav class="sidebar-nav">
-      <div class="nav-item active" id="navChat" onclick="resetToHero()">
+      <div class="nav-item active" id="navChat" onclick="startNewChat()">
         <span>💬</span>
         <span>Chat</span>
       </div>
@@ -902,6 +1009,12 @@ export function getHTML(env = {}) {
 
     <!-- Floating Input Dock -->
     <div class="input-dock">
+      <div id="attachmentPreviewBox" class="attachment-preview-box" style="display:none;">
+        <span style="font-size:14px;">📎</span>
+        <span id="attachedFileName" style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">file</span>
+        <button onclick="removeAttachment()" title="Remove attachment" style="background:none; border:none; color:#fff; cursor:pointer; font-weight:bold; margin-left:4px;">✕</button>
+      </div>
+
       <div class="input-wrapper">
         <button class="icon-btn" id="attachBtn" title="Attach Image or File">📎</button>
         <input type="file" id="fileInput" accept="image/*,.txt,.md,.json,.py,.js" style="display:none;">
@@ -922,15 +1035,15 @@ export function getHTML(env = {}) {
 
       <!-- Quick Action Pills -->
       <div class="quick-pills-row">
-        <div class="quick-pill" onclick="quickPrompt('Write an optimized edge function in JavaScript for Cloudflare Workers')">
+        <div class="quick-pill" onclick="triggerCodePrompt()">
           <span>&lt;/&gt;</span>
           <span>Code</span>
         </div>
-        <div class="quick-pill" onclick="quickPrompt('Provide a deep step-by-step reasoning analysis on: ')">
+        <div class="quick-pill" onclick="triggerReasoningPrompt()">
           <span>💡</span>
           <span>Reason</span>
         </div>
-        <div class="quick-pill" onclick="quickPrompt('/imagine A futuristic cybernetic skyline in purple and cyan neon')">
+        <div class="quick-pill" onclick="triggerImagePrompt()">
           <span>🖼️</span>
           <span>Create Image</span>
         </div>
@@ -938,7 +1051,7 @@ export function getHTML(env = {}) {
           <span>🎙️</span>
           <span>Transcribe</span>
         </div>
-        <div class="quick-pill" onclick="quickPrompt('/translate hin_Deva Good morning! Ready for today goals.')">
+        <div class="quick-pill" onclick="triggerTranslatePrompt()">
           <span>🌐</span>
           <span>Translate</span>
         </div>
@@ -967,9 +1080,43 @@ export function getHTML(env = {}) {
         <p style="font-size:0.8rem; color:var(--text-dim); margin-bottom:16px;">
           Sign in or sign up with your Google account. Zero passwords required.
         </p>
-        <div id="googleBtnContainer" style="display:flex; justify-content:center; min-height:45px;"></div>
+
+        <!-- Declarative Google GSI Divs -->
+        <div id="g_id_onload"
+             data-client_id="${googleClientId}"
+             data-callback="handleGoogleCredentialResponse"
+             data-auto_prompt="false"
+             data-cancel_on_tap_outside="true">
+        </div>
+
+        <div id="googleBtnWrapper" style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:46px; gap:10px;">
+          <div id="googleBtnContainer" class="g_id_signin"
+               data-type="standard"
+               data-shape="pill"
+               data-theme="filled_blue"
+               data-text="continue_with"
+               data-size="large"
+               data-logo_alignment="left"
+               data-width="280">
+          </div>
+
+          <!-- Fallback Google Button in case iframe rendering delays or origin check needed -->
+          <button id="googleCustomBtn" class="google-custom-btn" onclick="triggerGoogleSignIn()" style="display:none;">
+            <svg width="18" height="18" viewBox="0 0 48 48">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+            </svg>
+            <span>Continue with Google</span>
+          </button>
+        </div>
+
         <div id="googleClientWarning" style="color:var(--amber); font-size:0.75rem; margin-top:12px; display:none;">
           ⚠️ GOOGLE_CLIENT_ID is not configured in wrangler.toml yet. Master Password can be used anytime.
+        </div>
+        <div id="googleOriginWarning" style="color:var(--text-dim); font-size:0.72rem; margin-top:12px; line-height:1.4;">
+          🔒 Secured via Google Identity Services. Ensure <code>http://localhost:3001</code> is added to Authorized JavaScript Origins in Google Cloud Console.
         </div>
       </div>
 
@@ -1107,7 +1254,7 @@ export function getHTML(env = {}) {
         <h3 class="modal-title">📰 Today's Edge Daily Briefing</h3>
         <button class="icon-btn" onclick="closeModal('briefingModal')">✕</button>
       </div>
-      <div id="briefingContent" style="font-size:0.92rem; line-height:1.6; color:#e2e8f0; white-space:pre-wrap; margin-bottom:16px;"></div>
+      <div id="briefingContent" class="briefing-rendered-content" style="font-size:0.92rem; line-height:1.7; color:#e2e8f0; margin-bottom:18px;"></div>
       <button class="primary-btn" onclick="refreshBriefing()">🔄 Refresh Briefing</button>
     </div>
   </div>
@@ -1159,29 +1306,75 @@ export function getHTML(env = {}) {
 
     function showAuthModal() {
       openModal("authModal");
-      if (GOOGLE_CLIENT_ID && typeof google !== "undefined" && google.accounts && google.accounts.id) {
-        initGoogleSignIn();
-      } else if (!GOOGLE_CLIENT_ID) {
-        document.getElementById("googleClientWarning").style.display = "block";
-      }
+      window.initGoogleSignIn();
     }
 
-    function initGoogleSignIn() {
+    let gsiInitialized = false;
+    window.initGoogleSignIn = function() {
+      if (!GOOGLE_CLIENT_ID) {
+        const warning = document.getElementById("googleClientWarning");
+        if (warning) warning.style.display = "block";
+        return;
+      }
+
+      if (typeof google === "undefined" || !google.accounts || !google.accounts.id) {
+        if (!window._gsiRetryCount) window._gsiRetryCount = 0;
+        if (window._gsiRetryCount++ < 50) {
+          setTimeout(window.initGoogleSignIn, 80);
+        } else {
+          const customBtn = document.getElementById("googleCustomBtn");
+          if (customBtn) customBtn.style.display = "flex";
+        }
+        return;
+      }
+
+      if (gsiInitialized) return;
+
       try {
         google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
-          callback: handleGoogleCredentialResponse,
+          callback: window.handleGoogleCredentialResponse,
+          auto_select: false,
+          cancel_on_tap_outside: true,
         });
-        google.accounts.id.renderButton(
-          document.getElementById("googleBtnContainer"),
-          { theme: "filled_blue", size: "large", shape: "pill", width: 280 }
-        );
-      } catch (err) {
-        console.error("GSI init error:", err);
-      }
-    }
 
-    async function handleGoogleCredentialResponse(response) {
+        const container = document.getElementById("googleBtnContainer");
+        if (container) {
+          container.innerHTML = "";
+          google.accounts.id.renderButton(container, {
+            theme: "filled_blue",
+            size: "large",
+            shape: "pill",
+            width: 280,
+            text: "continue_with",
+            logo_alignment: "left",
+          });
+          gsiInitialized = true;
+        }
+      } catch (err) {
+        console.warn("GSI programmatic render warning:", err);
+        const customBtn = document.getElementById("googleCustomBtn");
+        if (customBtn) customBtn.style.display = "flex";
+      }
+    };
+
+    window.triggerGoogleSignIn = function() {
+      if (typeof google !== "undefined" && google.accounts && google.accounts.id) {
+        try {
+          google.accounts.id.prompt((notification) => {
+            if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+              showAuthError("Google prompt suppressed: please ensure http://localhost:3001 is listed under Authorized JavaScript Origins in your Google Cloud Console.");
+            }
+          });
+        } catch (e) {
+          showAuthError("Google Sign-In prompt error: " + e.message);
+        }
+      } else {
+        showAuthError("Google Identity Services script is still loading or blocked. You can also sign in via Master Admin tab.");
+      }
+    };
+
+    window.handleGoogleCredentialResponse = async function(response) {
       if (!response || !response.credential) return;
       try {
         const res = await fetch("/api/auth/google", {
@@ -1201,9 +1394,9 @@ export function getHTML(env = {}) {
           showAuthError(data.error || "Google verification failed");
         }
       } catch (err) {
-        showAuthError("Connection error during Google sign-in");
+        showAuthError("Connection error during Google sign-in: " + err.message);
       }
-    }
+    };
 
     // Master Password Form Submit (Mehkesh)
     document.getElementById("masterPasswordSubmit").addEventListener("click", async () => {
@@ -1287,12 +1480,17 @@ export function getHTML(env = {}) {
         const sessions = await res.json();
         const list = document.getElementById("sessionsList");
         list.innerHTML = "";
+        if (!sessions || sessions.length === 0) {
+          list.innerHTML = '<div style="color:var(--text-dim); font-size:0.75rem; text-align:center; padding:18px 8px;">No conversations yet</div>';
+          return;
+        }
         sessions.forEach((s) => {
           const item = document.createElement("div");
           item.className = "session-item" + (s.id === currentSessionId ? " active" : "");
+          item.dataset.sessionId = s.id;
           item.innerHTML = \`
-            <span class="session-title">\${escapeHtml(s.title)}</span>
-            <button class="session-del-btn" onclick="event.stopPropagation(); deleteSession('\${s.id}')">✕</button>
+            <span class="session-title" title="\${escapeHtml(s.title)}">\${escapeHtml(s.title || "Chat Session")}</span>
+            <button class="session-del-btn" title="Delete conversation" onclick="event.stopPropagation(); deleteSession('\${s.id}')">✕</button>
           \`;
           item.onclick = () => selectSession(s.id);
           list.appendChild(item);
@@ -1300,50 +1498,80 @@ export function getHTML(env = {}) {
       } catch {}
     }
 
-    async function createNewSession(initialTitle = "New Chat") {
+    async function createSessionInternal(initialTitle = "New Chat") {
       try {
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ title: initialTitle }),
         });
-        const sess = await res.json();
-        currentSessionId = sess.id;
-        currentMessages = [];
-        loadSessions();
-        renderMessages();
-        return sess.id;
-      } catch {
-        return null;
-      }
+        if (res.ok) {
+          const sess = await res.json();
+          currentSessionId = sess.id;
+          loadSessions();
+          return sess.id;
+        }
+      } catch {}
+      currentSessionId = "sess_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6);
+      return currentSessionId;
     }
 
     async function selectSession(sessionId) {
+      if (isGenerating) return;
       currentSessionId = sessionId;
-      loadSessions();
+      document.querySelectorAll(".session-item").forEach((el) => {
+        el.classList.toggle("active", el.dataset.sessionId === sessionId);
+      });
+      const sidebar = document.getElementById("sidebar");
+      if (sidebar.classList.contains("open")) {
+        sidebar.classList.remove("open");
+      }
       try {
         const res = await fetch(\`/api/sessions/\${sessionId}\`);
+        if (!res.ok) throw new Error("Failed to load session");
         const data = await res.json();
-        currentMessages = data.messages || [];
-        renderMessages();
-      } catch {}
+        currentMessages = (data.messages || []).map((m) => ({
+          role: m.role,
+          content: m.content,
+          has_media: Boolean(m.has_media),
+        }));
+        renderFullChat(currentMessages);
+      } catch (err) {
+        showToast("Could not load session", "error");
+      }
     }
 
     async function deleteSession(sessionId) {
       try {
-        await fetch(\`/api/sessions/\${sessionId}\`, { method: "DELETE" });
-        if (currentSessionId === sessionId) {
-          currentSessionId = null;
-          currentMessages = [];
-          resetToHero();
+        const res = await fetch(\`/api/sessions/\${sessionId}\`, { method: "DELETE" });
+        if (res.ok) {
+          if (currentSessionId === sessionId) {
+            startNewChat();
+          }
+          loadSessions();
+          showToast("Conversation deleted", "info");
         }
-        loadSessions();
       } catch {}
     }
 
-    function resetToHero() {
+    function startNewChat() {
+      if (isGenerating) return;
       currentSessionId = null;
       currentMessages = [];
+      showHeroView();
+      document.querySelectorAll(".session-item").forEach((el) => el.classList.remove("active"));
+      const input = document.getElementById("chatInput");
+      input.value = "";
+      input.style.height = "auto";
+      input.focus();
+      removeAttachment();
+      const sidebar = document.getElementById("sidebar");
+      if (sidebar.classList.contains("open")) {
+        sidebar.classList.remove("open");
+      }
+    }
+
+    function showHeroView() {
       const container = document.getElementById("chatContainer");
       container.innerHTML = \`
         <div class="hero-view" id="heroView">
@@ -1354,8 +1582,145 @@ export function getHTML(env = {}) {
           <p class="hero-sub">Your personal, multi-model AI assistant at the edge.</p>
         </div>
       \`;
-      document.querySelectorAll(".session-item").forEach((el) => el.classList.remove("active"));
     }
+
+    function appendMessageRow(role, contentHtml, imageBase64 = null) {
+      const container = document.getElementById("chatContainer");
+      const hero = document.getElementById("heroView");
+      if (hero) hero.remove();
+
+      const row = document.createElement("div");
+      row.className = "message-row " + role;
+
+      const avatar = document.createElement("div");
+      avatar.className = "msg-avatar " + role;
+      if (role === "assistant") {
+        avatar.textContent = "M";
+      } else {
+        if (currentUser && currentUser.picture) {
+          avatar.innerHTML = \`<img src="\${currentUser.picture}" alt="User" style="width:100%; height:100%; border-radius:10px; object-fit:cover;">\`;
+        } else {
+          avatar.textContent = ((currentUser && currentUser.full_name) ? currentUser.full_name.charAt(0) : "U").toUpperCase();
+        }
+      }
+
+      const bubble = document.createElement("div");
+      bubble.className = "msg-bubble";
+
+      if (imageBase64) {
+        const img = document.createElement("img");
+        img.src = imageBase64;
+        img.style.cssText = "max-width:260px; max-height:200px; border-radius:10px; display:block; margin-bottom:10px; border:1px solid rgba(255,255,255,0.15); box-shadow:0 4px 16px rgba(0,0,0,0.4);";
+        bubble.appendChild(img);
+      }
+
+      const contentBox = document.createElement("div");
+      contentBox.className = "msg-content-text";
+      contentBox.innerHTML = contentHtml;
+      bubble.appendChild(contentBox);
+
+      row.appendChild(avatar);
+      row.appendChild(bubble);
+      container.appendChild(row);
+
+      container.scrollTop = container.scrollHeight;
+      return { row, bubble: contentBox };
+    }
+
+    function renderFullChat(messages) {
+      const container = document.getElementById("chatContainer");
+      container.innerHTML = "";
+      if (!messages || messages.length === 0) {
+        showHeroView();
+        return;
+      }
+      messages.forEach((msg) => {
+        let contentHtml = "";
+        if (msg.role === "assistant") {
+          contentHtml = marked.parse(DOMPurify.sanitize(msg.content || ""));
+        } else {
+          contentHtml = escapeHtml(msg.content || "");
+        }
+        const { bubble } = appendMessageRow(msg.role, contentHtml);
+        if (msg.role === "assistant") {
+          bubble.querySelectorAll("pre code").forEach((b) => hljs.highlightElement(b));
+          addCopyButtons(bubble);
+        }
+      });
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function addCopyButtons(parentEl) {
+      if (!parentEl) return;
+      const pres = parentEl.querySelectorAll("pre");
+      pres.forEach((pre) => {
+        if (pre.querySelector(".copy-code-btn")) return;
+        const btn = document.createElement("button");
+        btn.className = "copy-code-btn";
+        btn.textContent = "Copy";
+        btn.onclick = async (e) => {
+          e.stopPropagation();
+          const code = pre.querySelector("code")?.textContent || pre.textContent;
+          try {
+            await navigator.clipboard.writeText(code);
+            btn.textContent = "Copied! ✓";
+            btn.classList.add("copied");
+            setTimeout(() => {
+              btn.textContent = "Copy";
+              btn.classList.remove("copied");
+            }, 2000);
+          } catch (err) {
+            showToast("Failed to copy", "error");
+          }
+        };
+        pre.appendChild(btn);
+      });
+    }
+
+    function removeAttachment() {
+      attachedImageData = null;
+      const box = document.getElementById("attachmentPreviewBox");
+      if (box) box.style.display = "none";
+      const fileInput = document.getElementById("fileInput");
+      if (fileInput) fileInput.value = "";
+    }
+
+    function triggerCodePrompt() {
+      const selector = document.getElementById("modelSelector");
+      if (selector) selector.value = "@cf/qwen/qwen2.5-coder-32b-instruct";
+      const input = document.getElementById("chatInput");
+      input.value = "Write an optimized edge function in JavaScript for: ";
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+      showToast("Switched to Qwen 2.5 Coder (32B)", "info");
+    }
+
+    function triggerReasoningPrompt() {
+      const selector = document.getElementById("modelSelector");
+      if (selector) selector.value = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+      const input = document.getElementById("chatInput");
+      input.value = "Analyze and reason step-by-step through: ";
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+      showToast("Switched to Llama 3.3 70B (Reasoning)", "info");
+    }
+
+    function triggerImagePrompt() {
+      const input = document.getElementById("chatInput");
+      input.value = "/imagine A futuristic cybernetic skyline in purple and cyan neon";
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+
+    function triggerTranslatePrompt() {
+      const input = document.getElementById("chatInput");
+      input.value = "/translate hin_Deva Good morning! Ready for today's goals.";
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+    }
+
+    window.resetToHero = startNewChat;
+    window.renderMessages = () => renderFullChat(currentMessages);
 
     // ========================================================================
     // Chat & Streaming Implementation
@@ -1367,19 +1732,119 @@ export function getHTML(env = {}) {
       document.getElementById("chatInput").value = "";
       document.getElementById("chatInput").style.height = "auto";
 
-      if (!currentSessionId) {
-        await createNewSession(prompt.slice(0, 36) + "...");
+      // 1. Slash Command: /imagine
+      if (prompt.startsWith("/imagine ")) {
+        const imagePrompt = prompt.slice(9).trim();
+        if (!currentSessionId) {
+          await createSessionInternal("🎨 " + imagePrompt.slice(0, 30));
+        }
+        appendMessageRow("user", escapeHtml(prompt));
+        const assistantRow = appendMessageRow(
+          "assistant",
+          '<div class="typing-dots"><span></span><span></span><span></span></div><span style="font-size:0.82rem; color:var(--text-muted); margin-left:8px;">Generating image with FLUX.1 Schnell at the edge...</span>'
+        );
+        isGenerating = true;
+        document.getElementById("sendBtn").style.display = "none";
+        document.getElementById("stopBtn").style.display = "flex";
+        try {
+          const res = await fetch("/api/imagine", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ prompt: imagePrompt, session_id: currentSessionId }),
+          });
+          const data = await res.json();
+          if (data.image) {
+            assistantRow.bubble.innerHTML = \`
+              <div style="margin-bottom:8px; font-weight:600; color:var(--purple);">🎨 FLUX.1 Schnell Generated:</div>
+              <img src="\${data.image}" alt="\${escapeHtml(imagePrompt)}" style="max-width:100%; border-radius:12px; border:1px solid rgba(139,92,246,0.3); box-shadow:0 8px 30px rgba(0,0,0,0.5);">
+              <div style="margin-top:10px;"><a href="\${data.image}" download="mehkesh-ai-flux.jpg" class="primary-btn" style="display:inline-block; font-size:0.75rem; padding:5px 12px; text-decoration:none; width:auto;">⬇ Download Image</a></div>
+            \`;
+            currentMessages.push({ role: "user", content: prompt });
+            currentMessages.push({ role: "assistant", content: \`![\${imagePrompt}](\${data.image})\` });
+          } else {
+            assistantRow.bubble.innerHTML = \`<span style="color:var(--red);">⚠️ \${data.error || "Failed to generate image"}</span>\`;
+          }
+        } catch (e) {
+          assistantRow.bubble.innerHTML = \`<span style="color:var(--red);">⚠️ Image generation request failed</span>\`;
+        } finally {
+          isGenerating = false;
+          document.getElementById("sendBtn").style.display = "flex";
+          document.getElementById("stopBtn").style.display = "none";
+          updateQuotaDisplay();
+          loadSessions();
+        }
+        return;
       }
 
-      // Add user message
-      const userMsg = { role: "user", content: prompt, has_image: Boolean(attachedImageData) };
-      currentMessages.push(userMsg);
-      renderMessages();
+      // 2. Slash Command: /translate
+      if (prompt.startsWith("/translate ")) {
+        const parts = prompt.slice(11).trim().split(" ").filter(Boolean);
+        let targetLang = "hin_Deva";
+        let textToTranslate = "";
+        if (parts[0] && parts[0].includes("_")) {
+          targetLang = parts[0];
+          textToTranslate = parts.slice(1).join(" ");
+        } else {
+          textToTranslate = parts.join(" ");
+        }
+        if (!currentSessionId) {
+          await createSessionInternal("🌐 " + textToTranslate.slice(0, 30));
+        }
+        appendMessageRow("user", escapeHtml(prompt));
+        const assistantRow = appendMessageRow(
+          "assistant",
+          '<div class="typing-dots"><span></span><span></span><span></span></div><span style="font-size:0.82rem; color:var(--text-muted); margin-left:8px;">Translating with IndicTrans2...</span>'
+        );
+        isGenerating = true;
+        document.getElementById("sendBtn").style.display = "none";
+        document.getElementById("stopBtn").style.display = "flex";
+        try {
+          const res = await fetch("/api/translate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: textToTranslate, target_lang: targetLang, session_id: currentSessionId }),
+          });
+          const data = await res.json();
+          if (data.translation) {
+            assistantRow.bubble.innerHTML = \`
+              <div style="margin-bottom:6px; font-weight:600; color:var(--cyan);">🌐 IndicTrans2 Translation (\${targetLang}):</div>
+              <div style="font-size:1.05rem; padding:8px 0; color:#fff;">\${escapeHtml(data.translation)}</div>
+            \`;
+            currentMessages.push({ role: "user", content: prompt });
+            currentMessages.push({ role: "assistant", content: data.translation });
+          } else {
+            assistantRow.bubble.innerHTML = \`<span style="color:var(--red);">⚠️ \${data.error || "Translation failed"}</span>\`;
+          }
+        } catch (e) {
+          assistantRow.bubble.innerHTML = \`<span style="color:var(--red);">⚠️ Translation request failed</span>\`;
+        } finally {
+          isGenerating = false;
+          document.getElementById("sendBtn").style.display = "flex";
+          document.getElementById("stopBtn").style.display = "none";
+          updateQuotaDisplay();
+          loadSessions();
+        }
+        return;
+      }
 
-      // Placeholder assistant message
+      // 3. Regular Chat Streaming
+      if (!currentSessionId) {
+        const autoTitle = prompt.length > 36 ? prompt.slice(0, 36) + "..." : prompt;
+        await createSessionInternal(autoTitle);
+      }
+
+      const sentImageData = attachedImageData;
+      removeAttachment();
+
+      // Add user message
+      const userMsg = { role: "user", content: prompt, has_image: Boolean(sentImageData) };
+      currentMessages.push(userMsg);
+      appendMessageRow("user", escapeHtml(prompt), sentImageData);
+
+      // Add assistant placeholder row
       const assistantMsg = { role: "assistant", content: "" };
       currentMessages.push(assistantMsg);
-      renderMessages();
+      const assistantRow = appendMessageRow("assistant", '<div class="typing-dots"><span></span><span></span><span></span></div>');
 
       isGenerating = true;
       document.getElementById("sendBtn").style.display = "none";
@@ -1397,17 +1862,15 @@ export function getHTML(env = {}) {
             session_id: currentSessionId,
             messages: currentMessages.slice(0, -1),
             model_override: chosenOverride,
-            has_image: Boolean(attachedImageData),
-            image_data: attachedImageData,
+            has_image: Boolean(sentImageData),
+            image_data: sentImageData,
           }),
         });
-
-        attachedImageData = null;
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
           assistantMsg.content = "⚠️ " + (errData.error || "Generation error");
-          renderMessages();
+          assistantRow.bubble.innerHTML = \`<span style="color:var(--red);">\${escapeHtml(assistantMsg.content)}</span>\`;
           isGenerating = false;
           return;
         }
@@ -1415,6 +1878,7 @@ export function getHTML(env = {}) {
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
+        let accumulatedText = "";
 
         while (true) {
           const { done, value } = await reader.read();
@@ -1431,12 +1895,28 @@ export function getHTML(env = {}) {
             if (dataStr === "[DONE]") break;
             try {
               const parsed = JSON.parse(dataStr);
-              if (parsed.response) assistantMsg.content += parsed.response;
+              if (parsed.response) accumulatedText += parsed.response;
             } catch {
-              if (dataStr) assistantMsg.content += dataStr;
+              if (dataStr) accumulatedText += dataStr;
             }
           }
-          renderMessages();
+
+          if (accumulatedText) {
+            assistantMsg.content = accumulatedText;
+            assistantRow.bubble.innerHTML = marked.parse(DOMPurify.sanitize(accumulatedText));
+            const container = document.getElementById("chatContainer");
+            container.scrollTop = container.scrollHeight;
+          }
+        }
+
+        // Finalize markdown, apply syntax highlighting, add copy buttons
+        if (accumulatedText) {
+          assistantMsg.content = accumulatedText;
+          assistantRow.bubble.innerHTML = marked.parse(DOMPurify.sanitize(accumulatedText));
+          assistantRow.bubble.querySelectorAll("pre code").forEach((b) => hljs.highlightElement(b));
+          addCopyButtons(assistantRow.bubble);
+          const container = document.getElementById("chatContainer");
+          container.scrollTop = container.scrollHeight;
         }
 
         if (useBrowserVoice && assistantMsg.content && window.speechSynthesis) {
@@ -1445,48 +1925,15 @@ export function getHTML(env = {}) {
       } catch (err) {
         if (err.name !== "AbortError") {
           assistantMsg.content += "\\n\\n[Connection interrupted]";
-          renderMessages();
+          assistantRow.bubble.innerHTML = marked.parse(DOMPurify.sanitize(assistantMsg.content));
         }
       } finally {
         isGenerating = false;
         document.getElementById("sendBtn").style.display = "flex";
         document.getElementById("stopBtn").style.display = "none";
         updateQuotaDisplay();
+        loadSessions();
       }
-    }
-
-    function renderMessages() {
-      const container = document.getElementById("chatContainer");
-      if (currentMessages.length === 0) {
-        resetToHero();
-        return;
-      }
-
-      container.innerHTML = "";
-      currentMessages.forEach((msg) => {
-        const row = document.createElement("div");
-        row.className = "message-row " + msg.role;
-
-        const avatar = document.createElement("div");
-        avatar.className = "msg-avatar " + msg.role;
-        avatar.textContent = msg.role === "assistant" ? "M" : (currentUser?.full_name?.charAt(0) || "U");
-
-        const bubble = document.createElement("div");
-        bubble.className = "msg-bubble";
-
-        if (msg.role === "assistant") {
-          bubble.innerHTML = marked.parse(DOMPurify.sanitize(msg.content || "Thinking..."));
-          bubble.querySelectorAll("pre code").forEach((block) => hljs.highlightElement(block));
-        } else {
-          bubble.textContent = msg.content;
-        }
-
-        row.appendChild(avatar);
-        row.appendChild(bubble);
-        container.appendChild(row);
-      });
-
-      container.scrollTop = container.scrollHeight;
     }
 
     // ========================================================================
@@ -1574,29 +2021,41 @@ export function getHTML(env = {}) {
     }
 
     // ========================================================================
-    // Daily Briefing
+    // Daily Briefing (Personalized & Markdown Rendered)
     // ========================================================================
     async function showDailyBriefing() {
       openModal("briefingModal");
       const content = document.getElementById("briefingContent");
-      content.textContent = "Loading briefing from edge...";
+      content.innerHTML = "<p style='color:var(--text-muted);'>Loading your personalized briefing from edge...</p>";
       try {
         const res = await fetch("/api/briefing/today");
         const data = await res.json();
-        content.textContent = data.summary || "No briefing recorded.";
+        if (data && data.summary) {
+          content.innerHTML = marked.parse(DOMPurify.sanitize(data.summary));
+        } else {
+          content.innerHTML = "<p>No briefing recorded for today yet.</p>";
+        }
       } catch {
-        content.textContent = "Failed to load daily briefing.";
+        content.innerHTML = "<p style='color:var(--red);'>Failed to load daily briefing.</p>";
       }
     }
 
     async function refreshBriefing() {
       const content = document.getElementById("briefingContent");
-      content.textContent = "Generating fresh edge briefing with Llama 4 Scout...";
+      content.innerHTML = "<p style='color:var(--text-muted);'>Generating fresh personalized edge briefing with Llama 4 Scout...</p>";
       try {
         const res = await fetch("/api/briefing/refresh", { method: "POST" });
         const data = await res.json();
-        content.textContent = data.briefing?.summary || "Briefing updated.";
-      } catch {}
+        const summary = data.briefing?.summary || data.summary;
+        if (summary) {
+          content.innerHTML = marked.parse(DOMPurify.sanitize(summary));
+          showToast("Daily briefing refreshed", "success");
+        } else {
+          content.innerHTML = "<p>Briefing updated.</p>";
+        }
+      } catch {
+        content.innerHTML = "<p style='color:var(--red);'>Failed to refresh briefing.</p>";
+      }
     }
 
     // ========================================================================
@@ -1681,6 +2140,9 @@ export function getHTML(env = {}) {
       document.getElementById("tabMasterAuth").classList.toggle("active", tab === "master");
       document.getElementById("authGooglePane").style.display = tab === "google" ? "block" : "none";
       document.getElementById("authMasterPane").style.display = tab === "master" ? "block" : "none";
+      if (tab === "google") {
+        window.initGoogleSignIn();
+      }
     }
 
     function switchSettingsTab(tab) {
@@ -1692,7 +2154,7 @@ export function getHTML(env = {}) {
     }
 
     function setupEventListeners() {
-      document.getElementById("newChatBtn").addEventListener("click", () => resetToHero());
+      document.getElementById("newChatBtn").addEventListener("click", () => startNewChat());
       document.getElementById("sendBtn").addEventListener("click", () => sendMessage());
       document.getElementById("stopBtn").addEventListener("click", () => {
         if (activeAbortController) activeAbortController.abort();
@@ -1705,6 +2167,10 @@ export function getHTML(env = {}) {
           sendMessage();
         }
       });
+      chatInput.addEventListener("input", () => {
+        chatInput.style.height = "auto";
+        chatInput.style.height = Math.min(chatInput.scrollHeight, 160) + "px";
+      });
 
       document.getElementById("attachBtn").addEventListener("click", () => {
         document.getElementById("fileInput").click();
@@ -1716,6 +2182,10 @@ export function getHTML(env = {}) {
         const reader = new FileReader();
         reader.onload = (evt) => {
           attachedImageData = evt.target.result;
+          const fileNameEl = document.getElementById("attachedFileName");
+          if (fileNameEl) fileNameEl.textContent = file.name;
+          const previewBox = document.getElementById("attachmentPreviewBox");
+          if (previewBox) previewBox.style.display = "flex";
           showToast("Attached: " + file.name, "info");
         };
         reader.readAsDataURL(file);

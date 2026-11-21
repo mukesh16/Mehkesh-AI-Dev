@@ -6,8 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "node --test test/**/*.test.js",
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "dev": "npx wrangler dev --port 3001",
+    "deploy": "npx wrangler deploy",
     "d1:create": "wrangler d1 create mehkesh-ai-dev",
     "d1:apply:local": "wrangler d1 execute mehkesh-ai-dev --local --file=schema.sql",
     "d1:apply:remote": "wrangler d1 execute mehkesh-ai-dev --remote --file=schema.sql"
