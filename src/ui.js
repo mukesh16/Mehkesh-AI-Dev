@@ -1115,8 +1115,8 @@ export function getHTML(env = {}) {
         <div id="googleClientWarning" style="color:var(--amber); font-size:0.75rem; margin-top:12px; display:none;">
           ⚠️ GOOGLE_CLIENT_ID is not configured in wrangler.toml yet. Master Password can be used anytime.
         </div>
-        <div id="googleOriginWarning" style="color:var(--text-dim); font-size:0.72rem; margin-top:12px; line-height:1.4;">
-          🔒 Secured via Google Identity Services. Ensure <code>http://localhost:3001</code> is added to Authorized JavaScript Origins in Google Cloud Console.
+        <div id="googleOriginWarning" style="color:var(--text-dim); font-size:0.74rem; margin-top:14px; text-align:center;">
+          🔒 Secured via Google Identity Services
         </div>
       </div>
 
@@ -1363,7 +1363,7 @@ export function getHTML(env = {}) {
         try {
           google.accounts.id.prompt((notification) => {
             if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-              showAuthError("Google prompt suppressed: please ensure http://localhost:3001 is listed under Authorized JavaScript Origins in your Google Cloud Console.");
+              showAuthError("Google Sign-In prompt was dismissed. Please click the button to try again.");
             }
           });
         } catch (e) {
