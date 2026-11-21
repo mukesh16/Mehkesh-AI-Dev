@@ -1,0 +1,19 @@
+{
+  "name": "ai-mehkesh-dev",
+  "version": "1.0.0",
+  "description": "Cloudflare Workers AI chat app branded as Mehkesh AI (Development & RBAC Multi-User)",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/**/*.test.js",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "d1:create": "wrangler d1 create mehkesh-ai-dev",
+    "d1:apply:local": "wrangler d1 execute mehkesh-ai-dev --local --file=schema.sql",
+    "d1:apply:remote": "wrangler d1 execute mehkesh-ai-dev --remote --file=schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^3.114.0",
+    "@cloudflare/workerd-windows-64": "^1.20241106.0"
+  }
+}
