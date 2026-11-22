@@ -115,6 +115,20 @@ async function checkUserQuota(user, env) {
     return { allowed: true, used: 0, budget: 99999999, is_admin: true };
   }
 
+  if (user.is_guest) {
+    const used = user.neurons_used_today || 0;
+    if (used >= 3) {
+      return {
+        allowed: false,
+        used,
+        budget: 3,
+        reason: "You have used your 3 free guest queries for today. Please sign in with Google or Master Password to continue.",
+        require_auth: true
+      };
+    }
+    return { allowed: true, used, budget: 3, is_guest: true };
+  }
+
   if (!env.DB) return { allowed: true, used: 0, budget: user.neuron_budget || 2000 };
 
   try {
@@ -137,6 +151,80 @@ async function checkUserQuota(user, env) {
     return { allowed: true, used, budget };
   } catch (err) {
     return { allowed: true, used: 0, budget: user.neuron_budget || 2000 };
+  }
+}
+
+// ============================================================================
+// Guest IP Hash & Quota Tracker (Edge protection against incognito abuse)
+// ============================================================================
+async function getGuestIpHash(request) {
+  const clientIp = request.headers.get("cf-connecting-ip") ||
+    request.headers.get("x-real-ip") ||
+    request.headers.get("x-forwarded-for") ||
+    "127.0.0.1";
+  const encoder = new TextEncoder();
+  const rawIp = clientIp.split(",")[0].trim();
+  const data = encoder.encode(rawIp + "_mehkesh_guest_edge_salt_2026");
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 24);
+}
+
+async function checkGuestQuota(request, env) {
+  const today = new Date().toISOString().slice(0, 10);
+  const ipHash = await getGuestIpHash(request);
+
+  if (!env.DB) {
+    return { allowed: true, remaining: 3, used: 0, ipHash, today };
+  }
+
+  try {
+    await env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS guest_usage (
+        ip_hash TEXT NOT NULL,
+        query_date TEXT NOT NULL,
+        query_count INTEGER DEFAULT 0,
+        PRIMARY KEY(ip_hash, query_date)
+      )
+    `).run().catch(() => {});
+
+    const row = await env.DB.prepare(
+      "SELECT query_count FROM guest_usage WHERE ip_hash = ? AND query_date = ?"
+    ).bind(ipHash, today).first();
+
+    const used = row?.query_count || 0;
+    const maxFree = 3;
+    const remaining = Math.max(0, maxFree - used);
+
+    if (used >= maxFree) {
+      return {
+        allowed: false,
+        used,
+        remaining: 0,
+        ipHash,
+        today,
+        reason: "You have used your 3 free guest queries for today. Please sign in with Google or Master Password to continue."
+      };
+    }
+
+    return { allowed: true, used, remaining, ipHash, today };
+  } catch (err) {
+    console.error("Guest quota check error:", err);
+    return { allowed: true, remaining: 3, used: 0, ipHash, today };
+  }
+}
+
+async function recordGuestUsage(ipHash, today, env) {
+  if (!env.DB || !ipHash) return;
+  try {
+    await env.DB.prepare(`
+      INSERT INTO guest_usage (ip_hash, query_date, query_count)
+      VALUES (?, ?, 1)
+      ON CONFLICT(ip_hash, query_date) DO UPDATE SET
+        query_count = query_count + 1
+    `).bind(ipHash, today).run();
+  } catch (e) {
+    console.error("Error recording guest usage:", e);
   }
 }
 
@@ -517,7 +605,18 @@ export default {
     if (method === "GET" && pathname === "/api/auth/me") {
       const user = await authenticateRequest(request, env);
       if (!user) {
-        return jsonResponse({ authenticated: false });
+        const guestCheck = await checkGuestQuota(request, env);
+        return jsonResponse({
+          authenticated: false,
+          guest: {
+            allowed: guestCheck.allowed,
+            used: guestCheck.used,
+            remaining: guestCheck.remaining,
+            max: 3,
+          },
+          guest_remaining: guestCheck.remaining,
+          guest_limit: 3,
+        });
       }
       return jsonResponse({
         authenticated: true,
@@ -533,8 +632,8 @@ export default {
       });
     }
 
-    // 5. Master Password Verification Endpoint (For Mehkesh)
-    if (method === "POST" && pathname === "/api/auth/verify") {
+    // 5. Master Password Verification Endpoint (For Mehkesh - Supports both /api/auth/verify and /api/auth/admin)
+    if (method === "POST" && (pathname === "/api/auth/verify" || pathname === "/api/auth/admin")) {
       let password = extractMasterPassword(request);
       if (!password) {
         try {
@@ -563,11 +662,16 @@ export default {
         getJwtSecret(env)
       );
 
+      const cookieHeaders = [
+        `auth_password=${encodeURIComponent(password)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`,
+        `auth_token=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`,
+      ].join(", ");
+
       return jsonResponse(
         { ok: true, user: masterUser, token, message: "Welcome back, Mehkesh. Master access granted." },
         200,
         {
-          "Set-Cookie": `auth_password=${encodeURIComponent(password)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`,
+          "Set-Cookie": cookieHeaders,
         }
       );
     }
@@ -709,12 +813,62 @@ export default {
     }
 
     // ========================================================================
-    // ENFORCE AUTHENTICATION FOR ALL /api/* ROUTES BELOW
+    // ENFORCE AUTHENTICATION OR GUEST ALLOWANCE FOR ALL /api/* ROUTES BELOW
     // ========================================================================
     if (pathname.startsWith("/api/")) {
-      const user = await authenticateRequest(request, env);
+      let user = await authenticateRequest(request, env);
+      let isGuest = false;
+
       if (!user) {
-        return jsonResponse({ error: "Unauthorized: Please sign in with Google or enter Master Password." }, 401);
+        // Guest mode allows /api/chat, /api/sessions, /api/transcribe, /api/audio/transcribe, /api/imagine up to 3 queries/day
+        const allowedGuestPaths = [
+          "/api/chat",
+          "/api/sessions",
+          "/api/transcribe",
+          "/api/audio/transcribe",
+          "/api/imagine",
+        ];
+        const isGuestPath = allowedGuestPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
+
+        if (isGuestPath) {
+          const guestCheck = await checkGuestQuota(request, env);
+          if (!guestCheck.allowed) {
+            return jsonResponse(
+              {
+                error: guestCheck.reason,
+                require_auth: true,
+                guest_exhausted: true,
+              },
+              401
+            );
+          }
+
+          isGuest = true;
+          user = {
+            id: "usr_guest_" + (guestCheck.ipHash || "anon"),
+            email: "guest_" + (guestCheck.ipHash || "anon") + "@guest.mehkesh.ai",
+            full_name: "Guest Explorer",
+            role: "guest",
+            neuron_budget: 3,
+            neurons_used_today: guestCheck.used,
+            is_active: 1,
+            is_guest: true,
+            guest_remaining: guestCheck.remaining,
+            ip_hash: guestCheck.ipHash,
+            today: guestCheck.today,
+          };
+
+          if (env.DB) {
+            try {
+              await env.DB.prepare(`
+                INSERT OR IGNORE INTO users (id, email, full_name, picture, role, neuron_budget, is_active)
+                VALUES (?, ?, 'Guest Explorer', '', 'guest', 3, 1)
+              `).bind(user.id, user.email).run();
+            } catch (e) {}
+          }
+        } else {
+          return jsonResponse({ error: "Unauthorized: Please sign in with Google or enter Master Password.", require_auth: true }, 401);
+        }
       }
 
       // Attach user to context for subsequent route handlers
@@ -1018,20 +1172,41 @@ export default {
       }
 
       // ----------------------------------------------------------------------
-      // Creative Suite: Transcribe (Whisper Large v3 Turbo)
+      // Creative Suite: Transcribe (Whisper Large v3 Turbo - Supports /api/transcribe & /api/audio/transcribe)
       // ----------------------------------------------------------------------
-      if (pathname === "/api/transcribe" && method === "POST") {
+      if ((pathname === "/api/transcribe" || pathname === "/api/audio/transcribe") && method === "POST") {
         if (!env.AI) return jsonResponse({ error: "Workers AI is not bound" }, 500);
         const quota = await checkUserQuota(user, env);
         if (!quota.allowed) return jsonResponse({ error: quota.reason }, 429);
 
         try {
-          const audioBuffer = await request.arrayBuffer();
-          if (!audioBuffer || audioBuffer.byteLength < 300) {
+          let audioBytes = null;
+          const contentType = request.headers.get("content-type") || "";
+
+          if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
+            try {
+              const formData = await request.formData();
+              const file = formData.get("audio") || formData.get("file");
+              if (file && typeof file.arrayBuffer === "function") {
+                const buffer = await file.arrayBuffer();
+                audioBytes = [...new Uint8Array(buffer)];
+              }
+            } catch (formErr) {
+              console.error("FormData parse error in transcribe:", formErr);
+            }
+          }
+
+          if (!audioBytes) {
+            const audioBuffer = await request.arrayBuffer();
+            if (audioBuffer && audioBuffer.byteLength > 200) {
+              audioBytes = [...new Uint8Array(audioBuffer)];
+            }
+          }
+
+          if (!audioBytes || audioBytes.length < 200) {
             return jsonResponse({ text: "" });
           }
 
-          const audioBytes = [...new Uint8Array(audioBuffer)];
           let res;
           try {
             res = await env.AI.run(MODELS.STT, { audio: audioBytes });
@@ -1174,7 +1349,11 @@ export default {
         }
 
         const body = await request.json().catch(() => ({}));
-        const { session_id, messages, model_override, has_image, image_data } = body;
+        const session_id = body.session_id;
+        const messages = body.messages;
+        const model_override = body.model_override || body.model;
+        const image_data = body.image_data || body.image;
+        const has_image = Boolean(body.has_image || image_data);
 
         if (!Array.isArray(messages) || messages.length === 0) {
           return jsonResponse({ error: "Messages array is required" }, 400);
@@ -1323,7 +1502,13 @@ Always maintain the prestigious persona of Mehkesh AI. When providing code or te
                     await logChat.run();
                   }
 
-                  await extractAndSaveMemory(env, currentUserId, latestUserMessage, accumulatedResponse);
+                  if (!user.is_guest) {
+                    await extractAndSaveMemory(env, currentUserId, latestUserMessage, accumulatedResponse);
+                  }
+                }
+
+                if (user.is_guest) {
+                  await recordGuestUsage(user.ip_hash, user.today, env);
                 }
               } catch (bgErr) {
                 console.error("Background stream logging error:", bgErr);
@@ -1339,6 +1524,7 @@ Always maintain the prestigious persona of Mehkesh AI. When providing code or te
               "Access-Control-Allow-Origin": "*",
               "X-Model-Used": chosenModel,
               "X-Model-Reason": route.reason,
+              "X-Guest-Remaining": user.is_guest ? String(Math.max(0, (user.guest_remaining || 1) - 1)) : "unlimited",
             },
           });
         } catch (aiErr) {

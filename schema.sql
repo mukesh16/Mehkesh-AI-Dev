@@ -134,3 +134,14 @@ CREATE TABLE IF NOT EXISTS daily_briefings (
 );
 
 CREATE INDEX IF NOT EXISTS idx_briefings_date ON daily_briefings(briefing_date DESC);
+
+-- 9. Guest Usage Tracking (Edge-based IP hash protection against incognito abuse)
+CREATE TABLE IF NOT EXISTS guest_usage (
+  ip_hash TEXT NOT NULL,
+  query_date TEXT NOT NULL, -- e.g. '2026-11-22'
+  query_count INTEGER DEFAULT 0,
+  PRIMARY KEY(ip_hash, query_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_guest_usage_date ON guest_usage(query_date);
+

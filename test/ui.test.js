@@ -38,4 +38,37 @@ test('Mehkesh AI UI - HTML generation & client syntax verification', (t) => {
   assert.ok(html.includes('id="chatInput"'), 'Should contain composer textarea');
   assert.ok(html.includes('id="micBtn"'), 'Should contain voice recording button');
   assert.ok(html.includes('id="fileInput"'), 'Should contain screenshot/attachment file input');
+
+  // Verify WCAG 2.1 accessibility & performance enhancements
+  assert.ok(!html.includes('user-scalable=no'), 'Should not restrict user zoom/scaling for WCAG compliance');
+  assert.ok(html.includes('width=device-width, initial-scale=1.0'), 'Should have standard responsive viewport');
+
+  // Verify KaTeX math & Highlight.js code highlighting
+  assert.ok(html.includes('katex.min.js'), 'Should load KaTeX CDN script');
+  assert.ok(html.includes('auto-render.min.js'), 'Should load KaTeX auto-render script');
+  assert.ok(html.includes('hljs.highlightElement'), 'Should call hljs.highlightElement for active syntax coloring');
+
+  // Verify Theming (Light/Dark mode)
+  assert.ok(html.includes('html.light'), 'Should contain light theme stylesheet definitions');
+  assert.ok(html.includes('toggleTheme'), 'Should provide theme toggling function');
+  assert.ok(html.includes('id="themeToggleBtn"'), 'Should have theme toggle button in header');
+
+  // Verify Guest Mode with strict 3-query edge limit
+  assert.ok(html.includes('id="guestQuotaBadge"'), 'Should include guest quota badge in topbar');
+  assert.ok(html.includes('id="topbarSignInBtn"'), 'Should include topbar Sign In button for guest mode');
+  assert.ok(html.includes('id="authModalCloseBtn"'), 'Should allow guest users to dismiss auth modal');
+  assert.ok(html.includes('id="authGuestBanner"'), 'Should include guest exploration banner');
+
+  // Verify Local Device Voice TTS & Audio Whisper
+  assert.ok(html.includes('speechSynthesis'), 'Should use zero-neuron local device speech synthesis');
+  assert.ok(html.includes('toggleTTS'), 'Should provide TTS listen/stop toggling');
+  assert.ok(html.includes('toggleMicRecording'), 'Should provide voice recording via Whisper AI');
+
+  // Verify Expanded File & Code Attachments
+  assert.ok(html.includes('accept="image/*,.txt,.py,.js'), 'Should support code, data, and image attachments');
+  assert.ok(html.includes('attachment-preview-container'), 'Should provide attachment preview dock');
+
+  // Verify Slash Command Engine
+  assert.ok(html.includes('ArrowDown'), 'Should support keyboard navigation in slash commands');
+  assert.ok(html.includes('ALL_SLASH_COMMANDS'), 'Should define slash command registry');
 });

@@ -8,7 +8,7 @@ export function getHTML(env = {}) {
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${appName}</title>
   <meta name="description" content="Mehkesh AI - Personal AI Intelligence">
   
@@ -17,11 +17,14 @@ export function getHTML(env = {}) {
   <link rel="shortcut icon" type="image/png" href="/logo.png">
   <link rel="apple-touch-icon" href="/logo.png">
 
-  <!-- Highlight.js, Marked, DOMPurify (Edge CDNs) -->
+  <!-- Highlight.js, Marked, DOMPurify, KaTeX (Edge CDNs) -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.2/purify.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
 
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer onload="if(typeof initGoogleSignIn==='function')initGoogleSignIn()"></script>
@@ -41,15 +44,43 @@ export function getHTML(env = {}) {
       --cyan: #06b6d4;
       --text-main: #f8fafc;
       --text-muted: #94a3b8;
-      --text-dim: #64748b;
+      --text-dim: #94a3b8;
       --red: #ef4444;
       --green: #10b981;
       --sidebar-w: 260px;
       --header-h: 56px;
     }
 
+    html.light {
+      --bg-base: #f8fafc;
+      --bg-sidebar: #f1f5f9;
+      --bg-surface: #ffffff;
+      --bg-surface-hover: #e2e8f0;
+      --bg-input: #ffffff;
+      --border: rgba(0, 0, 0, 0.08);
+      --border-hover: rgba(0, 0, 0, 0.16);
+      --border-focus: rgba(139, 92, 246, 0.6);
+      --purple: #7c3aed;
+      --purple-hover: #6d28d9;
+      --cyan: #0284c7;
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --text-dim: #64748b;
+      --red: #dc2626;
+      --green: #059669;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; width: 100%; overflow: hidden; background: var(--bg-base); color: var(--text-main); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      background: var(--bg-base);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
 
     /* Root Layout */
     .app-root {
@@ -123,7 +154,7 @@ export function getHTML(env = {}) {
     .brand-name {
       font-size: 0.95rem;
       font-weight: 700;
-      color: #fff;
+      color: var(--text-main);
     }
 
     /* Sidebar Top Action: New Chat */
@@ -140,7 +171,7 @@ export function getHTML(env = {}) {
       border-radius: 8px;
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid var(--border);
-      color: #fff;
+      color: var(--text-main);
       font-size: 0.86rem;
       font-weight: 600;
       display: flex;
@@ -149,10 +180,13 @@ export function getHTML(env = {}) {
       cursor: pointer;
       transition: all 0.18s ease;
     }
+    html.light .new-chat-btn {
+      background: rgba(0, 0, 0, 0.04);
+    }
     .new-chat-btn:hover {
       background: rgba(139, 92, 246, 0.14);
       border-color: rgba(139, 92, 246, 0.4);
-      color: #fff;
+      color: var(--text-main);
     }
 
     /* Sidebar Navigation Links */
@@ -178,7 +212,7 @@ export function getHTML(env = {}) {
     }
     .nav-link-item:hover {
       background: var(--bg-surface-hover);
-      color: #fff;
+      color: var(--text-main);
     }
 
     .sidebar-divider {
@@ -199,17 +233,16 @@ export function getHTML(env = {}) {
     .sidebar-search input {
       width: 100%;
       padding: 6px 10px 6px 28px;
-      background: rgba(255, 255, 255, 0.03);
+      background: var(--bg-input);
       border: 1px solid var(--border);
       border-radius: 6px;
-      color: #fff;
+      color: var(--text-main);
       font-size: 0.8rem;
       outline: none;
       transition: border 0.15s;
     }
     .sidebar-search input:focus {
       border-color: var(--border-focus);
-      background: rgba(255, 255, 255, 0.05);
     }
     .sidebar-search .search-icon {
       position: absolute;
@@ -247,12 +280,12 @@ export function getHTML(env = {}) {
     }
     .session-item:hover {
       background: var(--bg-surface-hover);
-      color: #fff;
+      color: var(--text-main);
     }
     .session-item.active {
       background: rgba(139, 92, 246, 0.14);
-      color: #fff;
-      font-weight: 500;
+      color: var(--text-main);
+      font-weight: 600;
     }
     .session-title-text {
       white-space: nowrap;
@@ -278,7 +311,7 @@ export function getHTML(env = {}) {
       padding: 2px 4px;
       border-radius: 4px;
     }
-    .session-tool-btn:hover { color: #fff; }
+    .session-tool-btn:hover { color: var(--text-main); }
     .session-tool-btn.delete:hover { color: var(--red); }
 
     /* Sidebar Footer: User Card */
@@ -286,7 +319,7 @@ export function getHTML(env = {}) {
       padding: 10px 14px;
       border-top: 1px solid var(--border);
       flex-shrink: 0;
-      background: rgba(10, 12, 18, 0.6);
+      background: var(--bg-sidebar);
     }
     .user-profile-bar {
       display: flex;
@@ -326,7 +359,7 @@ export function getHTML(env = {}) {
     .user-name-display {
       font-size: 0.82rem;
       font-weight: 600;
-      color: #fff;
+      color: var(--text-main);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -351,7 +384,7 @@ export function getHTML(env = {}) {
     .topbar {
       height: var(--header-h);
       border-bottom: 1px solid var(--border);
-      background: rgba(9, 10, 15, 0.82);
+      background: var(--bg-base);
       backdrop-filter: blur(14px);
       display: flex;
       align-items: center;
@@ -383,7 +416,17 @@ export function getHTML(env = {}) {
     .icon-btn:hover {
       background: rgba(255, 255, 255, 0.06);
       border-color: var(--border);
-      color: #fff;
+      color: var(--text-main);
+    }
+    html.light .icon-btn:hover {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    /* Desktop Sidebar Toggle Button Logic */
+    @media (min-width: 769px) {
+      #sidebar:not(.collapsed) ~ .main-viewport #openSidebarBtn {
+        display: none;
+      }
     }
 
     /* Clean Model Selector Pill */
@@ -392,7 +435,7 @@ export function getHTML(env = {}) {
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 6px 12px;
-      color: #fff;
+      color: var(--text-main);
       font-size: 0.84rem;
       font-weight: 600;
       display: flex;
@@ -403,6 +446,9 @@ export function getHTML(env = {}) {
       position: relative;
       user-select: none;
     }
+    html.light .model-pill-btn {
+      background: rgba(0, 0, 0, 0.04);
+    }
     .model-pill-btn:hover {
       background: rgba(255, 255, 255, 0.08);
       border-color: var(--border-hover);
@@ -412,8 +458,8 @@ export function getHTML(env = {}) {
       position: absolute;
       top: calc(100% + 6px);
       left: 0;
-      width: 250px;
-      background: #111422;
+      width: 260px;
+      background: var(--bg-surface);
       border: 1px solid var(--border-hover);
       border-radius: 10px;
       padding: 6px;
@@ -435,7 +481,7 @@ export function getHTML(env = {}) {
     .model-item-title {
       font-size: 0.82rem;
       font-weight: 600;
-      color: #fff;
+      color: var(--text-main);
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -443,6 +489,41 @@ export function getHTML(env = {}) {
     .model-item-sub {
       font-size: 0.72rem;
       color: var(--text-dim);
+    }
+
+    /* Guest Quota Badge */
+    .guest-quota-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: rgba(139, 92, 246, 0.12);
+      border: 1px solid rgba(139, 92, 246, 0.35);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--purple);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      user-select: none;
+    }
+    .guest-quota-badge:hover {
+      background: rgba(139, 92, 246, 0.22);
+      border-color: rgba(139, 92, 246, 0.55);
+    }
+    .topbar-signin-btn {
+      padding: 5px 12px;
+      border-radius: 6px;
+      background: var(--purple);
+      color: #fff;
+      border: none;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .topbar-signin-btn:hover {
+      background: var(--purple-hover);
     }
 
     /* Chat Messages Viewport */
@@ -494,7 +575,7 @@ export function getHTML(env = {}) {
       font-size: 1.6rem;
       font-weight: 700;
       letter-spacing: -0.02em;
-      color: #fff;
+      color: var(--text-main);
       margin-bottom: 24px;
     }
 
@@ -515,15 +596,21 @@ export function getHTML(env = {}) {
       text-align: left;
       transition: all 0.2s ease;
     }
+    html.light .starter-card {
+      background: #ffffff;
+    }
     .starter-card:hover {
       background: rgba(255, 255, 255, 0.05);
       border-color: rgba(139, 92, 246, 0.45);
       transform: translateY(-1px);
     }
+    html.light .starter-card:hover {
+      background: #f1f5f9;
+    }
     .starter-card-tag {
       font-size: 0.74rem;
       font-weight: 600;
-      color: #fff;
+      color: var(--text-main);
       margin-bottom: 4px;
     }
     .starter-card-desc {
@@ -543,13 +630,13 @@ export function getHTML(env = {}) {
 
     .user-bubble {
       max-width: 82%;
-      background: #161924;
-      border: 1px solid rgba(255, 255, 255, 0.09);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hover);
       border-radius: 18px 18px 4px 18px;
       padding: 12px 18px;
       font-size: 0.94rem;
       line-height: 1.55;
-      color: #fff;
+      color: var(--text-main);
       word-break: break-word;
       position: relative;
     }
@@ -559,7 +646,7 @@ export function getHTML(env = {}) {
       position: absolute;
       top: -9px;
       right: 12px;
-      background: #242938;
+      background: var(--bg-surface-hover);
       border: 1px solid var(--border-hover);
       color: var(--text-muted);
       font-size: 0.72rem;
@@ -567,7 +654,7 @@ export function getHTML(env = {}) {
       border-radius: 6px;
       cursor: pointer;
     }
-    .user-edit-btn:hover { color: #fff; }
+    .user-edit-btn:hover { color: var(--text-main); }
 
     /* Assistant Open Document Layout */
     .assistant-avatar {
@@ -595,13 +682,13 @@ export function getHTML(env = {}) {
     .assistant-body {
       font-size: 0.95rem;
       line-height: 1.65;
-      color: #e2e8f0;
+      color: var(--text-main);
       word-break: break-word;
     }
     .assistant-body p { margin-bottom: 14px; }
     .assistant-body p:last-child { margin-bottom: 0; }
     .assistant-body h1, .assistant-body h2, .assistant-body h3 {
-      color: #fff;
+      color: var(--text-main);
       margin: 18px 0 10px;
       font-weight: 700;
     }
@@ -614,18 +701,48 @@ export function getHTML(env = {}) {
       color: var(--text-muted);
       font-style: italic;
     }
+
+    /* Responsive & Accessible Tables */
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+      margin: 16px 0;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      -webkit-overflow-scrolling: touch;
+    }
     .assistant-body table {
       width: 100%;
-      border-collapse: collapse;
-      margin: 16px 0;
+      border-collapse: separate;
+      border-spacing: 0;
       font-size: 0.88rem;
     }
     .assistant-body th, .assistant-body td {
-      border: 1px solid var(--border);
-      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+      padding: 10px 14px;
       text-align: left;
     }
-    .assistant-body th { background: rgba(255, 255, 255, 0.04); color: #fff; }
+    .assistant-body th:last-child, .assistant-body td:last-child {
+      border-right: none;
+    }
+    .assistant-body tr:last-child td {
+      border-bottom: none;
+    }
+    .assistant-body th {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-main);
+      font-weight: 600;
+    }
+    html.light .assistant-body th {
+      background: rgba(0, 0, 0, 0.04);
+    }
+    .assistant-body tr:nth-child(even) td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+    html.light .assistant-body tr:nth-child(even) td {
+      background: rgba(0, 0, 0, 0.02);
+    }
 
     /* Code Blocks */
     pre {
@@ -635,6 +752,9 @@ export function getHTML(env = {}) {
       margin: 14px 0;
       overflow: hidden;
       position: relative;
+    }
+    html.light pre {
+      background: #0f172a !important;
     }
     .code-header-bar {
       display: flex;
@@ -677,9 +797,9 @@ export function getHTML(env = {}) {
     .assistant-action-bar {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
       margin-top: 10px;
-      opacity: 0.7;
+      opacity: 0.8;
       transition: opacity 0.15s;
     }
     .assistant-action-bar:hover { opacity: 1; }
@@ -700,7 +820,10 @@ export function getHTML(env = {}) {
     .msg-action-btn:hover {
       background: rgba(255, 255, 255, 0.06);
       border-color: var(--border);
-      color: #fff;
+      color: var(--text-main);
+    }
+    html.light .msg-action-btn:hover {
+      background: rgba(0, 0, 0, 0.05);
     }
 
     /* Typing Dots */
@@ -738,7 +861,7 @@ export function getHTML(env = {}) {
     .composer-box {
       width: 100%;
       max-width: 780px;
-      background: #11131d;
+      background: var(--bg-surface);
       border: 1px solid var(--border-hover);
       border-radius: 16px;
       padding: 10px 14px 10px;
@@ -750,129 +873,47 @@ export function getHTML(env = {}) {
       border-color: var(--border-focus);
     }
 
-    /* Attachment Chip */
-    .attachment-preview-chip {
+    /* Attachment Container & Cards */
+    .attachment-preview-container {
       display: none;
-      align-items: center;
+      flex-wrap: wrap;
       gap: 8px;
-      background: rgba(139, 92, 246, 0.12);
-      border: 1px solid rgba(139, 92, 246, 0.3);
-      padding: 4px 10px;
-      border-radius: 6px;
       margin-bottom: 8px;
-      width: fit-content;
-      font-size: 0.78rem;
-      color: #fff;
-    }
-    .chip-remove-btn {
-      background: transparent;
-      border: none;
-      color: var(--text-dim);
-      cursor: pointer;
-      font-size: 0.8rem;
-    }
-    .chip-remove-btn:hover { color: #fff; }
-
-    /* Textarea */
-    .composer-textarea {
       width: 100%;
-      min-height: 44px;
-      max-height: 180px;
-      background: transparent;
-      border: none;
-      outline: none;
-      color: #fff;
-      font-size: 0.94rem;
-      line-height: 1.5;
-      font-family: inherit;
-      resize: none;
-      overflow-y: auto;
     }
-    .composer-textarea::placeholder {
-      color: var(--text-dim);
-    }
-
-    /* Composer Toolbar */
-    .composer-toolbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-top: 6px;
-
-      background: rgba(255, 255, 255, 0.06);
-      border-color: var(--border);
-      color: #fff;
-    }
-
-    /* Typing Dots */
-    .typing-indicator {
+    .attachment-card {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
-      padding: 6px 0;
-    }
-    .typing-indicator span {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--purple);
-      animation: typingPulse 1.4s infinite ease-in-out;
-    }
-    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
-    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes typingPulse {
-      0%, 80%, 100% { transform: scale(0.6); opacity: 0.3; }
-      40% { transform: scale(1); opacity: 1; }
-    }
-
-    /* Floating Composer Dock */
-    .composer-dock {
-      width: 100%;
-      padding: 0 16px 16px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      flex-shrink: 0;
-      background: linear-gradient(to top, var(--bg-base) 80%, transparent);
-      position: relative;
-    }
-    .composer-box {
-      width: 100%;
-      max-width: 780px;
-      background: #11131d;
-      border: 1px solid var(--border-hover);
-      border-radius: 16px;
-      padding: 10px 14px 10px;
-      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
-      position: relative;
-      transition: border 0.15s;
-    }
-    .composer-box:focus-within {
-      border-color: var(--border-focus);
-    }
-
-    /* Attachment Chip */
-    .attachment-preview-chip {
-      display: none;
-      align-items: center;
       gap: 8px;
       background: rgba(139, 92, 246, 0.12);
       border: 1px solid rgba(139, 92, 246, 0.3);
       padding: 4px 10px;
-      border-radius: 6px;
-      margin-bottom: 8px;
-      width: fit-content;
+      border-radius: 8px;
       font-size: 0.78rem;
-      color: #fff;
+      color: var(--text-main);
+      max-width: 280px;
+    }
+    .attachment-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      object-fit: cover;
+    }
+    .attachment-name {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
     }
     .chip-remove-btn {
       background: transparent;
       border: none;
       color: var(--text-dim);
       cursor: pointer;
-      font-size: 0.8rem;
+      font-size: 0.85rem;
+      padding: 0 2px;
     }
-    .chip-remove-btn:hover { color: #fff; }
+    .chip-remove-btn:hover { color: var(--red); }
 
     /* Textarea */
     .composer-textarea {
@@ -882,7 +923,7 @@ export function getHTML(env = {}) {
       background: transparent;
       border: none;
       outline: none;
-      color: #fff;
+      color: var(--text-main);
       font-size: 0.94rem;
       line-height: 1.5;
       font-family: inherit;
@@ -922,7 +963,10 @@ export function getHTML(env = {}) {
     }
     .composer-btn:hover {
       background: rgba(255, 255, 255, 0.08);
-      color: #fff;
+      color: var(--text-main);
+    }
+    html.light .composer-btn:hover {
+      background: rgba(0, 0, 0, 0.06);
     }
     .composer-btn.recording {
       color: var(--red);
@@ -956,7 +1000,7 @@ export function getHTML(env = {}) {
       width: 32px;
       height: 32px;
       border-radius: 50%;
-      background: #dc2626;
+      background: var(--red);
       border: none;
       color: #fff;
       cursor: pointer;
@@ -979,8 +1023,8 @@ export function getHTML(env = {}) {
       position: absolute;
       bottom: calc(100% + 8px);
       left: 14px;
-      width: 270px;
-      background: #141724;
+      width: 290px;
+      background: var(--bg-surface);
       border: 1px solid var(--border-hover);
       border-radius: 10px;
       padding: 6px;
@@ -998,9 +1042,11 @@ export function getHTML(env = {}) {
       font-size: 0.82rem;
       transition: background 0.15s;
     }
-    .slash-item:hover { background: rgba(139, 92, 246, 0.18); }
+    .slash-item:hover, .slash-item.selected {
+      background: rgba(139, 92, 246, 0.18);
+    }
     .slash-cmd { font-weight: 700; color: var(--purple); }
-    .slash-desc { color: var(--text-dim); font-size: 0.72rem; }
+    .slash-desc { color: var(--text-dim); font-size: 0.72rem; margin-left: 8px; text-align: right; }
 
     /* Drag & Drop Overlay */
     .drag-drop-overlay {
@@ -1032,7 +1078,7 @@ export function getHTML(env = {}) {
       padding: 16px;
     }
     .modal-card {
-      background: #121522;
+      background: var(--bg-surface);
       border: 1px solid var(--border-hover);
       border-radius: 14px;
       width: 100%;
@@ -1052,7 +1098,7 @@ export function getHTML(env = {}) {
       align-items: center;
       justify-content: space-between;
     }
-    .modal-title { font-size: 1rem; font-weight: 700; color: #fff; }
+    .modal-title { font-size: 1rem; font-weight: 700; color: var(--text-main); }
     .modal-body { padding: 20px; overflow-y: auto; max-height: 80vh; }
     .modal-footer {
       padding: 12px 20px;
@@ -1081,7 +1127,7 @@ export function getHTML(env = {}) {
       cursor: pointer;
       transition: all 0.15s;
     }
-    .modal-tab-btn:hover { color: #fff; }
+    .modal-tab-btn:hover { color: var(--text-main); }
     .modal-tab-btn.active {
       color: var(--purple);
       border-bottom-color: var(--purple);
@@ -1090,10 +1136,10 @@ export function getHTML(env = {}) {
     .form-input {
       width: 100%;
       padding: 9px 12px;
-      background: rgba(255, 255, 255, 0.04);
+      background: var(--bg-input);
       border: 1px solid var(--border);
       border-radius: 8px;
-      color: #fff;
+      color: var(--text-main);
       font-size: 0.86rem;
       margin-top: 6px;
       margin-bottom: 14px;
@@ -1123,7 +1169,7 @@ export function getHTML(env = {}) {
       font-size: 0.84rem;
       cursor: pointer;
     }
-    .secondary-btn:hover { background: var(--bg-surface-hover); color: #fff; }
+    .secondary-btn:hover { background: var(--bg-surface-hover); color: var(--text-main); }
 
     /* Admin Table */
     .admin-table {
@@ -1144,9 +1190,9 @@ export function getHTML(env = {}) {
     .budget-edit-input {
       width: 75px;
       padding: 3px 6px;
-      background: rgba(255, 255, 255, 0.04);
+      background: var(--bg-input);
       border: 1px solid var(--border);
-      color: #fff;
+      color: var(--text-main);
       border-radius: 4px;
       font-size: 0.8rem;
     }
@@ -1162,9 +1208,9 @@ export function getHTML(env = {}) {
       z-index: 300;
     }
     .toast {
-      background: #181c2d;
+      background: var(--bg-surface);
       border: 1px solid var(--border-hover);
-      color: #fff;
+      color: var(--text-main);
       padding: 10px 16px;
       border-radius: 8px;
       font-size: 0.84rem;
@@ -1187,6 +1233,9 @@ export function getHTML(env = {}) {
       }
       .sidebar.open { transform: translateX(0); }
       .starter-cards-grid { grid-template-columns: 1fr; }
+      .shortcut-tag { display: none !important; }
+      .chat-scroll-area { padding-bottom: 120px; }
+      .composer-dock { padding: 0 10px 10px; }
     }
   </style>
 </head>
@@ -1203,7 +1252,7 @@ export function getHTML(env = {}) {
           <img src="/logo.png" alt="Mehkesh AI" class="brand-logo-img">
           <span class="brand-name">Mehkesh AI</span>
         </div>
-        <button class="icon-btn" onclick="toggleSidebar()" title="Collapse Sidebar (Ctrl+[)">
+        <button class="icon-btn" onclick="toggleSidebar()" title="Collapse Sidebar (Ctrl+[)" aria-label="Collapse sidebar">
           ◧
         </button>
       </div>
@@ -1212,7 +1261,7 @@ export function getHTML(env = {}) {
       <div class="sidebar-top">
         <button class="new-chat-btn" onclick="startNewChat()">
           <span>+ New chat</span>
-          <span style="font-size:0.72rem; color:var(--text-dim);">Ctrl+K</span>
+          <span class="shortcut-tag" style="font-size:0.72rem; color:var(--text-dim);">Ctrl+K</span>
         </button>
       </div>
 
@@ -1276,7 +1325,7 @@ export function getHTML(env = {}) {
       <!-- Clean Header -->
       <header class="topbar">
         <div class="topbar-left">
-          <button class="icon-btn" id="openSidebarBtn" onclick="toggleSidebar()" title="Toggle Sidebar (Ctrl+[)">
+          <button class="icon-btn" id="openSidebarBtn" onclick="toggleSidebar()" title="Toggle Sidebar (Ctrl+[)" aria-label="Toggle sidebar">
             ☰
           </button>
 
@@ -1307,7 +1356,23 @@ export function getHTML(env = {}) {
         </div>
 
         <div class="topbar-right">
-          <button class="icon-btn" onclick="startNewChat()" title="New chat">
+          <!-- Guest Quota Badge -->
+          <div class="guest-quota-badge" id="guestQuotaBadge" style="display:none;" onclick="openModal('authModal')" title="Click to sign in for unlimited access">
+            <span>✨ Guest: 3 free queries</span>
+          </div>
+
+          <!-- Topbar Sign In Button -->
+          <button class="topbar-signin-btn" id="topbarSignInBtn" style="display:none;" onclick="openModal('authModal')">
+            Sign In
+          </button>
+
+          <!-- Theme Toggle Button -->
+          <button class="icon-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle Theme" aria-label="Toggle dark/light theme">
+            🌙
+          </button>
+
+          <!-- New Chat Button -->
+          <button class="icon-btn" onclick="startNewChat()" title="New chat" aria-label="Start new chat">
             ＋
           </button>
         </div>
@@ -1354,34 +1419,30 @@ export function getHTML(env = {}) {
         <div class="composer-box">
           <!-- Slash Popover -->
           <div class="slash-popover" id="slashPopover">
-            <div class="slash-item" onclick="applySlash('/imagine ')">
+            <div class="slash-item" data-cmd="/imagine " onclick="applySlash('/imagine ')">
               <span class="slash-cmd">/imagine</span>
               <span class="slash-desc">Generate images from description</span>
             </div>
-            <div class="slash-item" onclick="applySlash('/translate hin_Deva ')">
+            <div class="slash-item" data-cmd="/translate hin_Deva " onclick="applySlash('/translate hin_Deva ')">
               <span class="slash-cmd">/translate</span>
               <span class="slash-desc">Multilingual Indic translation</span>
             </div>
-            <div class="slash-item" onclick="applySlash('/code ')">
+            <div class="slash-item" data-cmd="/code " onclick="applySlash('/code ')">
               <span class="slash-cmd">/code</span>
               <span class="slash-desc">Code & architecture model</span>
             </div>
-            <div class="slash-item" onclick="applySlash('/reason ')">
+            <div class="slash-item" data-cmd="/reason " onclick="applySlash('/reason ')">
               <span class="slash-cmd">/reason</span>
               <span class="slash-desc">Deep reasoning model</span>
             </div>
-            <div class="slash-item" onclick="applySlash('/clear')">
+            <div class="slash-item" data-cmd="/clear" onclick="applySlash('/clear')">
               <span class="slash-cmd">/clear</span>
               <span class="slash-desc">Clear current chat</span>
             </div>
           </div>
 
-          <!-- Attachment Chip -->
-          <div class="attachment-preview-chip" id="attachmentPreviewChip">
-            <span>📎</span>
-            <span id="attachedFileNameText">screenshot.png</span>
-            <button class="chip-remove-btn" onclick="removeAttachment()">✕</button>
-          </div>
+          <!-- Attachment Preview Container -->
+          <div class="attachment-preview-container" id="attachmentPreviewContainer"></div>
 
           <!-- Textarea -->
           <textarea
@@ -1389,25 +1450,26 @@ export function getHTML(env = {}) {
             id="chatInput"
             placeholder="Message Mehkesh AI... (Type / for commands)"
             rows="1"
+            aria-label="Message Mehkesh AI"
           ></textarea>
 
-          <input type="file" id="fileInput" accept="image/*" style="display:none;">
+          <input type="file" id="fileInput" accept="image/*,.txt,.py,.js,.ts,.jsx,.tsx,.json,.csv,.md,.sql,.html,.css,.xml,.yml,.yaml,.sh" style="display:none;" aria-label="Attach file or screenshot">
 
           <!-- Bottom Actions -->
           <div class="composer-toolbar">
             <div class="composer-left">
-              <button class="composer-btn" onclick="document.getElementById('fileInput').click()" title="Attach image or screenshot">
+              <button class="composer-btn" onclick="document.getElementById('fileInput').click()" title="Attach file, code, or screenshot" aria-label="Attach file">
                 📎
               </button>
-              <button class="composer-btn" id="micBtn" onclick="toggleMicRecording()" title="Voice input (Whisper AI)">
+              <button class="composer-btn" id="micBtn" onclick="toggleMicRecording()" title="Voice input (Whisper AI)" aria-label="Record voice">
                 🎙️
               </button>
             </div>
             <div class="composer-right">
-              <button class="send-action-btn" id="sendBtn" onclick="sendMessage()" title="Send">
+              <button class="send-action-btn" id="sendBtn" onclick="sendMessage()" title="Send message" aria-label="Send message">
                 ↑
               </button>
-              <button class="stop-action-btn" id="stopBtn" onclick="stopGeneration()" title="Stop">
+              <button class="stop-action-btn" id="stopBtn" onclick="stopGeneration()" title="Stop generation" aria-label="Stop generation">
                 ■
               </button>
             </div>
@@ -1423,10 +1485,10 @@ export function getHTML(env = {}) {
     <div class="modal-card">
       <div class="modal-header">
         <div class="modal-title">📰 Daily Intelligence Briefing</div>
-        <button class="icon-btn" onclick="closeModal('briefingModal')">✕</button>
+        <button class="icon-btn" onclick="closeModal('briefingModal')" aria-label="Close modal">✕</button>
       </div>
       <div class="modal-body">
-        <div id="briefingContent" style="font-size:0.92rem; line-height:1.7; color:#e2e8f0; margin-bottom:18px;">
+        <div id="briefingContent" style="font-size:0.92rem; line-height:1.7; color:var(--text-main); margin-bottom:18px;">
           <p style="color:var(--text-muted);">Loading your daily briefing...</p>
         </div>
       </div>
@@ -1441,7 +1503,7 @@ export function getHTML(env = {}) {
     <div class="modal-card">
       <div class="modal-header">
         <div class="modal-title">🧠 Assistant Memories</div>
-        <button class="icon-btn" onclick="closeModal('memoryModal')">✕</button>
+        <button class="icon-btn" onclick="closeModal('memoryModal')" aria-label="Close modal">✕</button>
       </div>
       <div class="modal-body">
         <p style="font-size:0.84rem; color:var(--text-muted); margin-bottom:14px;">
@@ -1461,7 +1523,7 @@ export function getHTML(env = {}) {
     <div class="modal-card wide">
       <div class="modal-header">
         <div class="modal-title">Settings & Account</div>
-        <button class="icon-btn" onclick="closeModal('settingsModal')">✕</button>
+        <button class="icon-btn" onclick="closeModal('settingsModal')" aria-label="Close modal">✕</button>
       </div>
 
       <!-- Modal Tabs: Profile vs Admin Console -->
@@ -1478,9 +1540,16 @@ export function getHTML(env = {}) {
         <label class="form-label">Email</label>
         <input type="text" id="settingsEmailInput" class="form-input" disabled>
 
+        <label class="form-label">Theme Preference</label>
+        <div style="display:flex; gap:8px; margin-top:6px; margin-bottom:14px;">
+          <button class="secondary-btn" id="themeDarkBtn" onclick="setThemePreference('dark')">🌙 Dark</button>
+          <button class="secondary-btn" id="themeLightBtn" onclick="setThemePreference('light')">☀️ Light</button>
+          <button class="secondary-btn" id="themeSystemBtn" onclick="setThemePreference('system')">💻 System</button>
+        </div>
+
         <label class="form-label">Daily AI Budget</label>
         <div style="margin-top:6px; margin-bottom:16px;">
-          <div style="font-size:1.1rem; font-weight:700; color:#fff;" id="profileQuotaText">0 / 2,000 Credits</div>
+          <div style="font-size:1.1rem; font-weight:700; color:var(--text-main);" id="profileQuotaText">0 / 2,000 Credits</div>
           <div style="height:6px; width:100%; background:rgba(255,255,255,0.06); border-radius:3px; margin-top:8px; overflow:hidden;">
             <div id="profileProgressBar" style="width:0%; height:100%; background:linear-gradient(90deg, var(--purple), var(--cyan)); border-radius:3px;"></div>
           </div>
@@ -1488,7 +1557,7 @@ export function getHTML(env = {}) {
 
         <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
           <div>
-            <div style="font-weight:600; font-size:0.85rem; color:#fff;">Clear Conversations</div>
+            <div style="font-weight:600; font-size:0.85rem; color:var(--text-main);">Clear Conversations</div>
             <div style="font-size:0.75rem; color:var(--text-dim);">Permanently remove all chat history</div>
           </div>
           <button class="secondary-btn" style="color:var(--red); border-color:rgba(239,68,68,0.3); font-size:0.75rem; padding:5px 10px;" onclick="clearAllSessions()">Delete All</button>
@@ -1499,7 +1568,7 @@ export function getHTML(env = {}) {
       <div class="modal-body" id="tabPaneAdmin" style="display:none;">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
           <div>
-            <div style="font-weight:700; font-size:0.95rem; color:#fff;">User Management & Limits</div>
+            <div style="font-weight:700; font-size:0.95rem; color:var(--text-main);">User Management & Limits</div>
             <div style="font-size:0.78rem; color:var(--text-muted);">Adjust user daily budgets, suspend accounts, and view usage.</div>
           </div>
           <button class="secondary-btn" style="padding:4px 10px; font-size:0.75rem;" onclick="loadAdminUsers()">🔄 Refresh</button>
@@ -1525,7 +1594,7 @@ export function getHTML(env = {}) {
       </div>
 
       <div class="modal-footer">
-        <button class="secondary-btn" onclick="signOut()">Sign Out</button>
+        <button class="secondary-btn" id="signOutBtn" onclick="signOut()">Sign Out</button>
         <button class="primary-btn" onclick="closeModal('settingsModal')">Close</button>
       </div>
     </div>
@@ -1536,9 +1605,10 @@ export function getHTML(env = {}) {
     <div class="modal-card">
       <div class="modal-header">
         <div class="modal-title">Sign in to Mehkesh AI</div>
+        <button class="icon-btn" id="authModalCloseBtn" onclick="closeModal('authModal')" aria-label="Close modal">✕</button>
       </div>
       <div class="modal-body">
-        <p style="font-size:0.86rem; color:var(--text-muted); margin-bottom:16px;">
+        <p style="font-size:0.86rem; color:var(--text-muted); margin-bottom:16px;" id="authModalSubtitle">
           Sign in to access your personal AI assistant and chat history.
         </p>
 
@@ -1553,6 +1623,12 @@ export function getHTML(env = {}) {
         <label class="form-label">Master Admin Password</label>
         <input type="password" id="masterPasswordInput" class="form-input" placeholder="Enter password..." onkeydown="if(event.key==='Enter')submitMasterPassword()">
         <button class="primary-btn" style="width:100%;" onclick="submitMasterPassword()">Sign In</button>
+
+        <!-- Guest Exploration Banner -->
+        <div id="authGuestBanner" style="display:none; margin-top:14px; padding:10px 14px; border-radius:8px; background:rgba(139,92,246,0.1); border:1px solid rgba(139,92,246,0.25); font-size:0.78rem; text-align:center;">
+          <span>✨ Want to explore first? </span>
+          <a href="javascript:void(0)" onclick="closeModal('authModal')" style="color:var(--purple); font-weight:600; text-decoration:none;" id="guestBannerLink">Continue as Guest (3 free queries) →</a>
+        </div>
 
         <div id="authErrorMsg" style="color:var(--red); font-size:0.8rem; margin-top:12px; display:none; text-align:center;"></div>
         <div style="margin-top:16px; font-size:0.75rem; color:var(--text-dim); text-align:center;">
@@ -1569,18 +1645,33 @@ export function getHTML(env = {}) {
   <script>
     const GOOGLE_CLIENT_ID = "${googleClientId}";
     let currentUser = null;
+    let isGuest = false;
+    let guestRemaining = 3;
     let currentSessionId = null;
     let currentMessages = [];
     let isGenerating = false;
     let activeAbortController = null;
     let attachedImageData = null;
+    let attachedDocument = null;
     let selectedModel = "auto";
     let mediaRecorder = null;
     let audioChunks = [];
     let isRecordingAudio = false;
     let allSessionsList = [];
+    let activeUtterance = null;
+    let currentTheme = localStorage.getItem("mehkesh_theme") || "dark";
+    let slashIndex = 0;
+
+    const ALL_SLASH_COMMANDS = [
+      { cmd: "/imagine ", label: "/imagine", desc: "Generate images from description" },
+      { cmd: "/translate hin_Deva ", label: "/translate", desc: "Multilingual Indic translation" },
+      { cmd: "/code ", label: "/code", desc: "Code & architecture model" },
+      { cmd: "/reason ", label: "/reason", desc: "Deep reasoning model" },
+      { cmd: "/clear", label: "/clear", desc: "Clear current chat" }
+    ];
 
     document.addEventListener("DOMContentLoaded", async () => {
+      initTheme();
       // Event delegation for starter prompt cards
       const emptyHero = document.getElementById("emptyHero");
       if (emptyHero) {
@@ -1594,7 +1685,38 @@ export function getHTML(env = {}) {
     });
 
     // ========================================================================
-    // Authentication
+    // Theme Management
+    // ========================================================================
+    function initTheme() {
+      applyTheme(currentTheme);
+    }
+
+    function toggleTheme() {
+      const next = currentTheme === "light" ? "dark" : "light";
+      setThemePreference(next);
+    }
+
+    function setThemePreference(pref) {
+      currentTheme = pref;
+      localStorage.setItem("mehkesh_theme", pref);
+      applyTheme(pref);
+      showToast("Theme: " + pref, "info");
+    }
+
+    function applyTheme(pref) {
+      let active = pref;
+      if (pref === "system") {
+        active = window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+      }
+      document.documentElement.className = active;
+      const toggleBtn = document.getElementById("themeToggleBtn");
+      if (toggleBtn) {
+        toggleBtn.textContent = active === "light" ? "☀️" : "🌙";
+      }
+    }
+
+    // ========================================================================
+    // Authentication & Guest Mode
     // ========================================================================
     async function checkAuthStatus() {
       try {
@@ -1602,19 +1724,81 @@ export function getHTML(env = {}) {
         const data = await res.json();
         if (data && data.authenticated && data.user) {
           currentUser = data.user;
+          isGuest = false;
+          hideGuestUI();
           renderUserUI();
           loadSessions();
           updateQuotaDisplay();
           closeModal("authModal");
         } else {
-          showAuthModal();
+          currentUser = null;
+          isGuest = true;
+          guestRemaining = typeof data.guest_remaining !== "undefined" ? data.guest_remaining : 3;
+          renderGuestUI();
+          if (guestRemaining <= 0) {
+            showAuthModal(true);
+          } else {
+            closeModal("authModal");
+          }
         }
       } catch (e) {
-        showAuthModal();
+        currentUser = null;
+        isGuest = true;
+        guestRemaining = 3;
+        renderGuestUI();
       }
     }
 
-    function showAuthModal() {
+    function renderGuestUI() {
+      const badge = document.getElementById("guestQuotaBadge");
+      const signInBtn = document.getElementById("topbarSignInBtn");
+      const userBadge = document.getElementById("userRoleBadge");
+      const userDisplayName = document.getElementById("userDisplayName");
+      const guestBanner = document.getElementById("authGuestBanner");
+      const guestLink = document.getElementById("guestBannerLink");
+
+      if (badge) {
+        badge.style.display = "inline-flex";
+        badge.innerHTML = "<span>✨ Guest: " + guestRemaining + "/3 free</span>";
+      }
+      if (signInBtn) signInBtn.style.display = "inline-block";
+      if (userDisplayName) userDisplayName.textContent = "Guest Visitor";
+      if (userBadge) userBadge.textContent = "Free Guest • " + guestRemaining + " queries left";
+
+      if (guestBanner && guestRemaining > 0) {
+        guestBanner.style.display = "block";
+        if (guestLink) guestLink.textContent = "Continue as Guest (" + guestRemaining + " free queries) →";
+      } else if (guestBanner) {
+        guestBanner.style.display = "none";
+      }
+
+      document.getElementById("settingsNameInput").value = "Guest Visitor";
+      document.getElementById("settingsEmailInput").value = "guest@mehkesh.com";
+      document.getElementById("profileQuotaText").textContent = (3 - guestRemaining) + " / 3 Free Queries Used";
+      document.getElementById("profileProgressBar").style.width = Math.min(100, Math.round(((3 - guestRemaining) / 3) * 100)) + "%";
+      document.getElementById("tabBtnAdmin").style.display = "none";
+      const signOutBtn = document.getElementById("signOutBtn");
+      if (signOutBtn) signOutBtn.textContent = "Sign In";
+    }
+
+    function hideGuestUI() {
+      const badge = document.getElementById("guestQuotaBadge");
+      const signInBtn = document.getElementById("topbarSignInBtn");
+      const guestBanner = document.getElementById("authGuestBanner");
+      if (badge) badge.style.display = "none";
+      if (signInBtn) signInBtn.style.display = "none";
+      if (guestBanner) guestBanner.style.display = "none";
+      const signOutBtn = document.getElementById("signOutBtn");
+      if (signOutBtn) signOutBtn.textContent = "Sign Out";
+    }
+
+    function showAuthModal(forced) {
+      const sub = document.getElementById("authModalSubtitle");
+      if (forced && guestRemaining <= 0) {
+        sub.textContent = "You have used your 3 free guest queries today. Sign in to continue enjoying Mehkesh AI.";
+      } else {
+        sub.textContent = "Sign in to access your personal AI assistant and chat history.";
+      }
       openModal("authModal");
       window.initGoogleSignIn();
     }
@@ -1652,6 +1836,8 @@ export function getHTML(env = {}) {
         const data = await res.json();
         if (data.ok && data.user) {
           currentUser = data.user;
+          isGuest = false;
+          hideGuestUI();
           renderUserUI();
           loadSessions();
           updateQuotaDisplay();
@@ -1670,14 +1856,24 @@ export function getHTML(env = {}) {
       const password = input.value.trim();
       if (!password) return;
       try {
-        const res = await fetch("/api/auth/admin", {
+        // Try /api/auth/verify, fallback to /api/auth/admin
+        let res = await fetch("/api/auth/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ password })
         });
+        if (res.status === 404) {
+          res = await fetch("/api/auth/admin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ password })
+          });
+        }
         const data = await res.json();
         if (data.ok && data.user) {
           currentUser = data.user;
+          isGuest = false;
+          hideGuestUI();
           renderUserUI();
           loadSessions();
           updateQuotaDisplay();
@@ -1692,6 +1888,10 @@ export function getHTML(env = {}) {
     }
 
     async function signOut() {
+      if (isGuest) {
+        showAuthModal();
+        return;
+      }
       try {
         await fetch("/api/auth/logout", { method: "POST" });
         location.reload();
@@ -1778,6 +1978,7 @@ export function getHTML(env = {}) {
     // Sessions Management
     // ========================================================================
     async function loadSessions() {
+      if (isGuest) return;
       try {
         const res = await fetch("/api/sessions");
         const sessions = await res.json();
@@ -1973,7 +2174,7 @@ export function getHTML(env = {}) {
       const input = document.createElement("input");
       input.type = "text";
       input.value = currentTitle;
-      input.style.cssText = "width:100%; background:#10131e; border:1px solid var(--purple); color:#fff; padding:2px 6px; border-radius:4px; font-size:0.8rem;";
+      input.style.cssText = "width:100%; background:var(--bg-input); border:1px solid var(--purple); color:var(--text-main); padding:2px 6px; border-radius:4px; font-size:0.8rem;";
 
       input.onkeydown = async (e) => {
         if (e.key === "Enter") {
@@ -2063,27 +2264,11 @@ export function getHTML(env = {}) {
         const body = document.createElement("div");
         body.className = "assistant-body";
         body.innerHTML = marked.parse(DOMPurify.sanitize(contentText));
+        wrapTables(body);
         enhanceCodeBlocks(body);
+        renderMathInDOM(body);
 
-        const actions = document.createElement("div");
-        actions.className = "assistant-action-bar";
-
-        const copyBtn = document.createElement("button");
-        copyBtn.className = "msg-action-btn";
-        copyBtn.innerHTML = "📋 Copy";
-        copyBtn.onclick = () => {
-          navigator.clipboard.writeText(contentText);
-          copyBtn.innerHTML = "✓ Copied";
-          setTimeout(() => copyBtn.innerHTML = "📋 Copy", 2000);
-        };
-
-        const speakBtn = document.createElement("button");
-        speakBtn.className = "msg-action-btn";
-        speakBtn.innerHTML = "🔊 Listen";
-        speakBtn.onclick = () => toggleTTS(contentText, speakBtn);
-
-        actions.appendChild(copyBtn);
-        actions.appendChild(speakBtn);
+        const actions = buildActionBar(contentText);
         wrap.appendChild(body);
         wrap.appendChild(actions);
 
@@ -2096,11 +2281,31 @@ export function getHTML(env = {}) {
       return row;
     }
 
+    function wrapTables(container) {
+      container.querySelectorAll("table").forEach(tbl => {
+        if (!tbl.parentElement.classList.contains("table-container")) {
+          const wrap = document.createElement("div");
+          wrap.className = "table-container";
+          tbl.parentNode.insertBefore(wrap, tbl);
+          wrap.appendChild(tbl);
+        }
+      });
+    }
+
     function enhanceCodeBlocks(container) {
       container.querySelectorAll("pre").forEach(pre => {
-        if (pre.querySelector(".code-header-bar")) return;
         const codeEl = pre.querySelector("code");
         if (!codeEl) return;
+
+        // Apply Highlight.js syntax highlighting
+        if (window.hljs && !codeEl.dataset.highlighted) {
+          try {
+            hljs.highlightElement(codeEl);
+            codeEl.dataset.highlighted = "true";
+          } catch (e) {}
+        }
+
+        if (pre.querySelector(".code-header-bar")) return;
 
         let lang = "CODE";
         const match = codeEl.className.match(/language-([a-zA-Z0-9_-]+)/);
@@ -2109,7 +2314,7 @@ export function getHTML(env = {}) {
         const header = document.createElement("div");
         header.className = "code-header-bar";
         header.innerHTML = [
-          '<span>' + lang + '</span>',
+          '<span>' + escapeHtml(lang) + '</span>',
           '<div style="display:flex; gap:6px;">',
           '  <button class="code-action-btn download-btn">⬇ Download</button>',
           '  <button class="code-action-btn copy-btn">📋 Copy</button>',
@@ -2126,8 +2331,10 @@ export function getHTML(env = {}) {
           const blob = new Blob([codeEl.textContent], { type: "text/plain" });
           const a = document.createElement("a");
           a.href = URL.createObjectURL(blob);
-          const ext = lang.toLowerCase() === "javascript" ? "js" : (lang.toLowerCase() === "python" ? "py" : "txt");
-          a.download = "script-" + Date.now() + "." + ext;
+          const langLower = lang.toLowerCase();
+          const extMap = { javascript: "js", js: "js", typescript: "ts", ts: "ts", python: "py", py: "py", html: "html", css: "css", json: "json", sql: "sql", markdown: "md", md: "md", shell: "sh", bash: "sh" };
+          const ext = extMap[langLower] || "txt";
+          a.download = "code-" + Date.now() + "." + ext;
           a.click();
         };
 
@@ -2135,19 +2342,133 @@ export function getHTML(env = {}) {
       });
     }
 
+    function renderMathInDOM(container) {
+      if (typeof renderMathInElement === "function") {
+        try {
+          renderMathInElement(container, {
+            delimiters: [
+              { left: "$$", right: "$$", display: true },
+              { left: "$", right: "$", display: false },
+              { left: "\\\\(", right: "\\\\)", display: false },
+              { left: "\\\\[", right: "\\\\]", display: true }
+            ],
+            throwOnError: false
+          });
+        } catch (e) {}
+      }
+    }
+
+    function buildActionBar(text) {
+      const actions = document.createElement("div");
+      actions.className = "assistant-action-bar";
+
+      // Copy
+      const copyBtn = document.createElement("button");
+      copyBtn.className = "msg-action-btn";
+      copyBtn.innerHTML = "📋 Copy";
+      copyBtn.onclick = () => {
+        navigator.clipboard.writeText(text);
+        copyBtn.innerHTML = "✓ Copied";
+        setTimeout(() => copyBtn.innerHTML = "📋 Copy", 2000);
+      };
+
+      // Regenerate
+      const regenBtn = document.createElement("button");
+      regenBtn.className = "msg-action-btn";
+      regenBtn.innerHTML = "🔄 Regenerate";
+      regenBtn.onclick = () => regenerateLastAssistantMessage();
+
+      // Like / Dislike
+      const likeBtn = document.createElement("button");
+      likeBtn.className = "msg-action-btn";
+      likeBtn.innerHTML = "👍";
+      likeBtn.title = "Good response";
+      likeBtn.onclick = () => {
+        likeBtn.style.color = "var(--green)";
+        showToast("Thanks for the feedback!", "info");
+      };
+
+      const dislikeBtn = document.createElement("button");
+      dislikeBtn.className = "msg-action-btn";
+      dislikeBtn.innerHTML = "👎";
+      dislikeBtn.title = "Poor response";
+      dislikeBtn.onclick = () => {
+        dislikeBtn.style.color = "var(--red)";
+        showToast("Feedback recorded", "info");
+      };
+
+      // TTS Local Device Voice
+      const speakBtn = document.createElement("button");
+      speakBtn.className = "msg-action-btn";
+      speakBtn.innerHTML = "🔊 Listen";
+      speakBtn.onclick = () => toggleTTS(text, speakBtn);
+
+      actions.appendChild(copyBtn);
+      actions.appendChild(regenBtn);
+      actions.appendChild(likeBtn);
+      actions.appendChild(dislikeBtn);
+      actions.appendChild(speakBtn);
+      return actions;
+    }
+
     function toggleTTS(text, btn) {
-      if (!window.speechSynthesis) return;
+      if (!window.speechSynthesis) {
+        showToast("Device text-to-speech not supported", "info");
+        return;
+      }
       if (window.speechSynthesis.speaking) {
         window.speechSynthesis.cancel();
         btn.innerHTML = "🔊 Listen";
         return;
       }
-      const clean = text.replace(/[*#_]/g, "").slice(0, 1000);
+
+      // Clean technical markdown, code blocks, URLs, and formatting
+      const b3 = String.fromCharCode(96, 96, 96);
+      const b1 = String.fromCharCode(96);
+      const clean = text
+        .replace(new RegExp(b3 + "[\\\\s\\\\S]*?" + b3, "g"), "Code block omitted.")
+        .replace(new RegExp(b1 + "([^" + b1 + "]+)" + b1, "g"), "$1")
+        .replace(new RegExp("\\\\[([^\\\\]]+)\\\\]\\\\([^)]+\\\\)", "g"), "$1")
+        .replace(new RegExp("https?:\\\\/\\\\/\\\\S+", "g"), "")
+        .replace(/[*#_~>|]/g, "")
+        .replace(/\\n+/g, " ")
+        .trim()
+        .slice(0, 1500);
+
+      if (!clean) return;
+
       const utter = new SpeechSynthesisUtterance(clean);
-      utter.onend = () => btn.innerHTML = "🔊 Listen";
-      utter.onerror = () => btn.innerHTML = "🔊 Listen";
+      const voices = window.speechSynthesis.getVoices();
+      const naturalVoice = voices.find(v => v.lang.startsWith("en") && (v.name.includes("Natural") || v.name.includes("Google") || v.name.includes("Samantha") || v.name.includes("Neural") || v.name.includes("Premium"))) || voices.find(v => v.lang.startsWith("en"));
+      if (naturalVoice) utter.voice = naturalVoice;
+
+      utter.rate = 1.0;
+      utter.pitch = 1.0;
+
+      utter.onstart = () => { btn.innerHTML = "⏹ Stop"; };
+      utter.onend = () => { btn.innerHTML = "🔊 Listen"; };
+      utter.onerror = () => { btn.innerHTML = "🔊 Listen"; };
+
       window.speechSynthesis.speak(utter);
-      btn.innerHTML = "⏸ Stop";
+    }
+
+    function regenerateLastAssistantMessage() {
+      if (isGenerating) return;
+      for (let i = currentMessages.length - 1; i >= 0; i--) {
+        if (currentMessages[i].role === "user") {
+          const userPrompt = currentMessages[i].content;
+          if (currentMessages[currentMessages.length - 1].role === "assistant") {
+            currentMessages.pop();
+            const chatMaxWidth = document.getElementById("chatMaxWidth");
+            if (chatMaxWidth.lastElementChild && chatMaxWidth.lastElementChild.classList.contains("assistant")) {
+              chatMaxWidth.lastElementChild.remove();
+            }
+          }
+          currentMessages.pop();
+          sendMessage(userPrompt);
+          break;
+        }
+      }
     }
 
     function scrollToBottom() {
@@ -2159,14 +2480,20 @@ export function getHTML(env = {}) {
     // Chat Submission & Streaming Engine
     // ========================================================================
     async function sendMessage(overrideText) {
-      const prompt = overrideText || document.getElementById("chatInput").value.trim();
+      let prompt = overrideText || document.getElementById("chatInput").value.trim();
       if (!prompt || isGenerating) return;
 
       document.getElementById("chatInput").value = "";
       document.getElementById("chatInput").style.height = "auto";
       hideSlash();
 
-      if (!currentSessionId) {
+      // If document attached, embed it in code fence
+      if (attachedDocument) {
+        const fence = String.fromCharCode(96, 96, 96);
+        prompt = prompt + "\\n\\n--- Attached File: " + attachedDocument.name + " ---\\n" + fence + (attachedDocument.ext || "") + "\\n" + attachedDocument.content + "\\n" + fence + "\\n---";
+      }
+
+      if (!currentSessionId && !isGuest) {
         try {
           const sRes = await fetch("/api/sessions", {
             method: "POST",
@@ -2184,14 +2511,17 @@ export function getHTML(env = {}) {
 
       if (prompt.startsWith("/imagine ")) {
         handleFluxGeneration(prompt.slice(9).trim());
+        removeAttachment();
         return;
       }
       if (prompt.startsWith("/translate ")) {
         handleIndicTranslation(prompt.slice(11).trim());
+        removeAttachment();
         return;
       }
       if (prompt.startsWith("/clear")) {
         startNewChat();
+        removeAttachment();
         return;
       }
 
@@ -2231,7 +2561,10 @@ export function getHTML(env = {}) {
           messages: currentMessages,
           session_id: currentSessionId,
           model: selectedModel,
-          image: attachedImageData
+          model_override: selectedModel,
+          image: attachedImageData,
+          image_data: attachedImageData,
+          has_image: Boolean(attachedImageData)
         };
 
         const res = await fetch("/api/chat", {
@@ -2241,9 +2574,20 @@ export function getHTML(env = {}) {
           signal: activeAbortController.signal
         });
 
+        // Track guest remaining header
+        const remainingHeader = res.headers.get("x-guest-remaining");
+        if (remainingHeader !== null) {
+          guestRemaining = parseInt(remainingHeader, 10);
+          renderGuestUI();
+        }
+
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
-          body.innerHTML = '<span style="color:var(--red);">⚠️ ' + escapeHtml(errData.error || "Generation error") + '</span>';
+          const errMsg = errData.error || "Generation error";
+          body.innerHTML = '<span style="color:var(--red);">⚠️ ' + escapeHtml(errMsg) + '</span>';
+          if (res.status === 403 && (errMsg.includes("limit") || errMsg.includes("guest"))) {
+            showAuthModal(true);
+          }
           finalizeGeneration();
           return;
         }
@@ -2271,6 +2615,7 @@ export function getHTML(env = {}) {
               if (parsed.response) {
                 accumulatedText += parsed.response;
                 body.innerHTML = marked.parse(DOMPurify.sanitize(accumulatedText));
+                wrapTables(body);
                 scrollToBottom();
               }
             } catch (err) {}
@@ -2279,28 +2624,12 @@ export function getHTML(env = {}) {
 
         if (accumulatedText) {
           body.innerHTML = marked.parse(DOMPurify.sanitize(accumulatedText));
+          wrapTables(body);
           enhanceCodeBlocks(body);
+          renderMathInDOM(body);
           currentMessages.push({ role: "assistant", content: accumulatedText });
 
-          const actions = document.createElement("div");
-          actions.className = "assistant-action-bar";
-
-          const copyBtn = document.createElement("button");
-          copyBtn.className = "msg-action-btn";
-          copyBtn.innerHTML = "📋 Copy";
-          copyBtn.onclick = () => {
-            navigator.clipboard.writeText(accumulatedText);
-            copyBtn.innerHTML = "✓ Copied";
-            setTimeout(() => copyBtn.innerHTML = "📋 Copy", 2000);
-          };
-
-          const speakBtn = document.createElement("button");
-          speakBtn.className = "msg-action-btn";
-          speakBtn.innerHTML = "🔊 Listen";
-          speakBtn.onclick = () => toggleTTS(accumulatedText, speakBtn);
-
-          actions.appendChild(copyBtn);
-          actions.appendChild(speakBtn);
+          const actions = buildActionBar(accumulatedText);
           wrap.appendChild(actions);
         }
       } catch (e) {
@@ -2334,6 +2663,13 @@ export function getHTML(env = {}) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ prompt: promptText, session_id: currentSessionId })
         });
+
+        const remainingHeader = res.headers.get("x-guest-remaining");
+        if (remainingHeader !== null) {
+          guestRemaining = parseInt(remainingHeader, 10);
+          renderGuestUI();
+        }
+
         const data = await res.json();
         const chatMaxWidth = document.getElementById("chatMaxWidth");
         const lastRow = chatMaxWidth.lastElementChild;
@@ -2344,6 +2680,7 @@ export function getHTML(env = {}) {
           ].join('');
         } else {
           lastRow.querySelector(".assistant-body").innerHTML = '<span style="color:var(--red);">⚠️ ' + escapeHtml(data.error || "Image generation failed") + '</span>';
+          if (res.status === 403) showAuthModal(true);
         }
       } catch (e) {
         showToast("Image generation failed", "error");
@@ -2366,7 +2703,7 @@ export function getHTML(env = {}) {
         const chatMaxWidth = document.getElementById("chatMaxWidth");
         const lastRow = chatMaxWidth.lastElementChild;
         if (data.translation) {
-          lastRow.querySelector(".assistant-body").innerHTML = '<div style="font-size:1.05rem; color:#fff; padding:6px 0;">' + escapeHtml(data.translation) + '</div>';
+          lastRow.querySelector(".assistant-body").innerHTML = '<div style="font-size:1.05rem; color:var(--text-main); padding:6px 0;">' + escapeHtml(data.translation) + '</div>';
         } else {
           lastRow.querySelector(".assistant-body").innerHTML = '<span style="color:var(--red);">⚠️ ' + escapeHtml(data.error || "Translation failed") + '</span>';
         }
@@ -2396,7 +2733,10 @@ export function getHTML(env = {}) {
             const formData = new FormData();
             formData.append("audio", audioBlob, "recording.webm");
             try {
-              const res = await fetch("/api/audio/transcribe", { method: "POST", body: formData });
+              let res = await fetch("/api/transcribe", { method: "POST", body: formData });
+              if (res.status === 404) {
+                res = await fetch("/api/audio/transcribe", { method: "POST", body: formData });
+              }
               const data = await res.json();
               if (data.text) {
                 const input = document.getElementById("chatInput");
@@ -2430,14 +2770,35 @@ export function getHTML(env = {}) {
       chatInput.addEventListener("input", () => {
         chatInput.style.height = "auto";
         chatInput.style.height = Math.min(chatInput.scrollHeight, 180) + "px";
-        if (chatInput.value.startsWith("/")) {
-          document.getElementById("slashPopover").classList.add("active");
-        } else {
-          hideSlash();
-        }
+        handleSlashFilter(chatInput.value);
       });
 
       chatInput.addEventListener("keydown", (e) => {
+        const popover = document.getElementById("slashPopover");
+        if (popover && popover.classList.contains("active")) {
+          const items = popover.querySelectorAll(".slash-item");
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            slashIndex = (slashIndex + 1) % items.length;
+            updateSlashSelection(items);
+            return;
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            slashIndex = (slashIndex - 1 + items.length) % items.length;
+            updateSlashSelection(items);
+            return;
+          } else if (e.key === "Enter" || e.key === "Tab") {
+            e.preventDefault();
+            if (items[slashIndex]) {
+              applySlash(items[slashIndex].dataset.cmd);
+            }
+            return;
+          } else if (e.key === "Escape") {
+            hideSlash();
+            return;
+          }
+        }
+
         if (e.key === "Enter" && !e.shiftKey) {
           e.preventDefault();
           sendMessage();
@@ -2489,24 +2850,119 @@ export function getHTML(env = {}) {
       });
     }
 
-    function handleIncomingFile(file) {
-      if (!file || !file.type.startsWith("image/")) {
-        showToast("Only image attachments supported", "info");
+    function handleSlashFilter(text) {
+      const popover = document.getElementById("slashPopover");
+      if (!text.startsWith("/")) {
+        hideSlash();
         return;
       }
+      const query = text.toLowerCase().slice(1).trim();
+      const filtered = ALL_SLASH_COMMANDS.filter(c => c.label.toLowerCase().includes(query) || c.desc.toLowerCase().includes(query));
+
+      if (filtered.length === 0) {
+        hideSlash();
+        return;
+      }
+
+      popover.innerHTML = "";
+      filtered.forEach((c, idx) => {
+        const div = document.createElement("div");
+        div.className = "slash-item" + (idx === 0 ? " selected" : "");
+        div.dataset.cmd = c.cmd;
+        div.onclick = () => applySlash(c.cmd);
+        div.innerHTML = '<span class="slash-cmd">' + escapeHtml(c.label) + '</span><span class="slash-desc">' + escapeHtml(c.desc) + '</span>';
+        popover.appendChild(div);
+      });
+      slashIndex = 0;
+      popover.classList.add("active");
+    }
+
+    function updateSlashSelection(items) {
+      items.forEach((item, i) => {
+        item.classList.toggle("selected", i === slashIndex);
+      });
+    }
+
+    function handleIncomingFile(file) {
+      if (!file) return;
+
+      // Handle Image Files
+      if (file.type.startsWith("image/")) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          attachedImageData = e.target.result;
+          attachedDocument = null;
+          renderAttachmentUI(file.name || "Screenshot", true, e.target.result);
+          showToast("Image attached", "info");
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+
+      // Handle Code & Text Files
+      if (file.size > 1024 * 1024) {
+        showToast("Text files limited to 1MB", "info");
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = (e) => {
-        attachedImageData = e.target.result;
-        document.getElementById("attachedFileNameText").textContent = file.name || "Screenshot";
-        document.getElementById("attachmentPreviewChip").style.display = "inline-flex";
-        showToast("Image attached", "info");
+        const ext = file.name.split(".").pop() || "txt";
+        attachedDocument = {
+          name: file.name,
+          content: e.target.result,
+          size: file.size,
+          ext: ext
+        };
+        attachedImageData = null;
+        renderAttachmentUI(file.name, false);
+        showToast("Document attached", "info");
       };
-      reader.readAsDataURL(file);
+      reader.readAsText(file);
+    }
+
+    function renderAttachmentUI(fileName, isImage, thumbSrc) {
+      const container = document.getElementById("attachmentPreviewContainer");
+      container.innerHTML = "";
+      container.style.display = "flex";
+
+      const card = document.createElement("div");
+      card.className = "attachment-card";
+
+      if (isImage && thumbSrc) {
+        const img = document.createElement("img");
+        img.className = "attachment-thumb";
+        img.src = thumbSrc;
+        card.appendChild(img);
+      } else {
+        const icon = document.createElement("span");
+        icon.className = "attachment-doc-icon";
+        icon.textContent = "📄";
+        card.appendChild(icon);
+      }
+
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "attachment-name";
+      nameSpan.textContent = fileName;
+      card.appendChild(nameSpan);
+
+      const delBtn = document.createElement("button");
+      delBtn.className = "chip-remove-btn";
+      delBtn.textContent = "✕";
+      delBtn.onclick = removeAttachment;
+      card.appendChild(delBtn);
+
+      container.appendChild(card);
     }
 
     function removeAttachment() {
       attachedImageData = null;
-      document.getElementById("attachmentPreviewChip").style.display = "none";
+      attachedDocument = null;
+      const container = document.getElementById("attachmentPreviewContainer");
+      if (container) {
+        container.innerHTML = "";
+        container.style.display = "none";
+      }
       document.getElementById("fileInput").value = "";
     }
 
@@ -2533,6 +2989,7 @@ export function getHTML(env = {}) {
         const data = await res.json();
         if (data && data.summary) {
           content.innerHTML = marked.parse(DOMPurify.sanitize(data.summary));
+          wrapTables(content);
         } else {
           content.innerHTML = '<p style="color:var(--text-muted);">No briefing recorded for today yet. Click <strong>Refresh Briefing</strong> below to generate the daily briefing.</p>';
         }
@@ -2550,6 +3007,7 @@ export function getHTML(env = {}) {
         const summary = (data.briefing && data.briefing.summary) || data.summary;
         if (summary) {
           content.innerHTML = marked.parse(DOMPurify.sanitize(summary));
+          wrapTables(content);
           showToast("Briefing updated", "success");
         } else {
           content.innerHTML = '<p style="color:var(--text-muted);">Briefing updated.</p>';
@@ -2625,6 +3083,11 @@ export function getHTML(env = {}) {
     }
 
     async function updateQuotaDisplay() {
+      if (isGuest) {
+        document.getElementById("profileQuotaText").textContent = (3 - guestRemaining) + " / 3 Free Queries Used";
+        document.getElementById("profileProgressBar").style.width = Math.min(100, Math.round(((3 - guestRemaining) / 3) * 100)) + "%";
+        return;
+      }
       try {
         const res = await fetch("/api/quota");
         const q = await res.json();
