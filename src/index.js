@@ -792,6 +792,16 @@ export default {
           ).bind(id, currentUserId, title).run();
           return jsonResponse({ id, title, created_at: new Date().toISOString() });
         }
+
+        if (method === "DELETE") {
+          try {
+            await env.DB.prepare("DELETE FROM messages WHERE user_id = ?").bind(currentUserId).run();
+            await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(currentUserId).run();
+            return jsonResponse({ ok: true, message: "All sessions cleared" });
+          } catch (e) {
+            return jsonResponse({ error: "Failed to clear sessions" }, 500);
+          }
+        }
       }
 
       if (pathname.startsWith("/api/sessions/")) {
@@ -804,7 +814,7 @@ export default {
             const [session, msgs] = await Promise.all([
               env.DB.prepare("SELECT * FROM sessions WHERE id = ? AND user_id = ?").bind(sessionId, currentUserId).first(),
               env.DB.prepare(
-                "SELECT id, role, content, model_used, has_media, created_at FROM messages WHERE session_id = ? AND user_id = ? ORDER BY created_at ASC"
+                "SELECT id, role, content, model_used, has_media, created_at FROM messages WHERE session_id = ? AND user_id = ? ORDER BY rowid ASC"
               ).bind(sessionId, currentUserId).all(),
             ]);
 
@@ -814,6 +824,19 @@ export default {
             return jsonResponse({ session, messages: msgs?.results || [] });
           } catch (e) {
             return jsonResponse({ session: { id: sessionId, title: "Chat Session" }, messages: [] });
+          }
+        }
+
+        if (method === "PATCH" || method === "PUT") {
+          try {
+            const body = await request.json().catch(() => ({}));
+            const title = (body.title || "Chat Session").slice(0, 80).trim();
+            await env.DB.prepare(
+              "UPDATE sessions SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?"
+            ).bind(title, sessionId, currentUserId).run();
+            return jsonResponse({ ok: true, id: sessionId, title });
+          } catch (e) {
+            return jsonResponse({ error: "Failed to rename session" }, 500);
           }
         }
 
