@@ -71,3 +71,16 @@ test('Mehkesh AI Edge Worker - Guest Mode Route Allowance & Headers', async (t) 
   assert.strictEqual(dataMe.guest_limit, 3);
   assert.strictEqual(typeof dataMe.guest_remaining, 'number');
 });
+
+test('Mehkesh AI Edge Worker - Logout Header & Cookie Invalidation', async (t) => {
+  const reqLogout = new Request('https://ai-dev.mehkesh.com/api/auth/logout', { method: 'POST' });
+  const env = {};
+  const ctx = { waitUntil: () => {} };
+
+  const res = await worker.fetch(reqLogout, env, ctx);
+  assert.strictEqual(res.status, 200, 'Logout should succeed');
+  const setCookie = res.headers.get('set-cookie') || '';
+  assert.ok(setCookie.includes('auth_token='), 'Should clear auth_token');
+  assert.ok(setCookie.includes('auth_password='), 'Should clear auth_password');
+  assert.ok(setCookie.includes('Max-Age=0'), 'Should expire cookies immediately');
+});

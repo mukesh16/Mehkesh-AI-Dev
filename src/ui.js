@@ -264,7 +264,7 @@ export function getHTML(env = {}) {
       text-transform: uppercase;
       letter-spacing: 0.06em;
       color: var(--text-dim);
-      padding: 10px 8px 4px;
+      padding: 12px 10px 4px;
     }
     .session-item {
       display: flex;
@@ -530,18 +530,23 @@ export function getHTML(env = {}) {
     .chat-scroll-area {
       flex: 1;
       overflow-y: auto;
+      overflow-x: hidden;
+      width: 100%;
       padding: 24px 16px 20px;
       display: flex;
       flex-direction: column;
       align-items: center;
       min-height: 0;
+      box-sizing: border-box;
     }
     .chat-max-width {
       width: 100%;
       max-width: 780px;
+      min-width: 0;
       display: flex;
       flex-direction: column;
       gap: 22px;
+      box-sizing: border-box;
     }
 
     /* Empty State Hero */
@@ -623,13 +628,16 @@ export function getHTML(env = {}) {
     .message-row {
       display: flex;
       width: 100%;
+      min-width: 0;
       position: relative;
+      box-sizing: border-box;
     }
     .message-row.user { justify-content: flex-end; }
     .message-row.assistant { justify-content: flex-start; gap: 12px; }
 
     .user-bubble {
       max-width: 82%;
+      min-width: 0;
       background: var(--bg-surface);
       border: 1px solid var(--border-hover);
       border-radius: 18px 18px 4px 18px;
@@ -700,6 +708,15 @@ export function getHTML(env = {}) {
       margin: 14px 0;
       color: var(--text-muted);
       font-style: italic;
+    }
+    .assistant-body img {
+      max-width: 100%;
+      height: auto;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      display: block;
+      margin: 14px 0 10px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
     }
 
     /* Responsive & Accessible Tables */
@@ -1894,10 +1911,11 @@ export function getHTML(env = {}) {
       }
       try {
         await fetch("/api/auth/logout", { method: "POST" });
-        location.reload();
-      } catch (e) {
-        location.reload();
-      }
+      } catch (e) {}
+      // Client-side cookie wipe for defense-in-depth
+      document.cookie = "auth_token=; Path=/; Max-Age=0; SameSite=Lax";
+      document.cookie = "auth_password=; Path=/; Max-Age=0; SameSite=Lax";
+      location.reload();
     }
 
     function renderUserUI() {
@@ -1962,6 +1980,9 @@ export function getHTML(env = {}) {
     function selectModel(modelKey, label) {
       selectedModel = modelKey;
       document.getElementById("currentModelLabel").textContent = label;
+      document.querySelectorAll(".model-dropdown-item").forEach(item => {
+        item.classList.toggle("selected", item.getAttribute("onclick")?.includes(modelKey));
+      });
       document.getElementById("modelDropdownMenu").classList.remove("active");
       showToast("Model: " + label, "info");
     }
@@ -2263,9 +2284,10 @@ export function getHTML(env = {}) {
 
         const body = document.createElement("div");
         body.className = "assistant-body";
-        body.innerHTML = marked.parse(DOMPurify.sanitize(contentText));
+        body.innerHTML = DOMPurify.sanitize(marked.parse(contentText));
         wrapTables(body);
         enhanceCodeBlocks(body);
+        enhanceImages(body);
         renderMathInDOM(body);
 
         const actions = buildActionBar(contentText);
@@ -2279,6 +2301,42 @@ export function getHTML(env = {}) {
       chatMaxWidth.appendChild(row);
       scrollToBottom();
       return row;
+    }
+
+    function enhanceImages(container) {
+      container.querySelectorAll("img").forEach(img => {
+        if (img.closest(".assistant-avatar") || img.closest(".code-header-bar")) return;
+        img.style.maxWidth = "100%";
+        img.style.height = "auto";
+        img.style.borderRadius = "12px";
+        img.style.border = "1px solid var(--border)";
+        img.style.display = "block";
+        img.style.margin = "12px 0 8px";
+        img.style.boxShadow = "0 4px 20px rgba(0, 0, 0, 0.25)";
+
+        if (!img.nextElementSibling || !img.nextElementSibling.classList.contains("img-action-wrap")) {
+          const wrap = document.createElement("div");
+          wrap.className = "img-action-wrap";
+          wrap.style.marginTop = "8px";
+          wrap.style.marginBottom = "14px";
+
+          const a = document.createElement("a");
+          a.href = img.src;
+          a.download = "mehkesh-image.jpg";
+          a.className = "primary-btn";
+          a.style.display = "inline-flex";
+          a.style.alignItems = "center";
+          a.style.gap = "6px";
+          a.style.textDecoration = "none";
+          a.style.fontSize = "0.78rem";
+          a.style.padding = "5px 12px";
+          a.style.borderRadius = "6px";
+          a.innerHTML = "⬇ Download Image";
+
+          wrap.appendChild(a);
+          img.parentNode.insertBefore(wrap, img.nextSibling);
+        }
+      });
     }
 
     function wrapTables(container) {
@@ -2480,6 +2538,11 @@ export function getHTML(env = {}) {
     // Chat Submission & Streaming Engine
     // ========================================================================
     async function sendMessage(overrideText) {
+      if (isGuest && guestRemaining <= 0) {
+        showToast("You have used your 3 free guest queries for today. Please sign in to continue.", "warning");
+        showAuthModal(true);
+        return;
+      }
       let prompt = overrideText || document.getElementById("chatInput").value.trim();
       if (!prompt || isGenerating) return;
 
@@ -2495,10 +2558,16 @@ export function getHTML(env = {}) {
 
       if (!currentSessionId && !isGuest) {
         try {
+          let sTitle = prompt.slice(0, 36);
+          if (prompt.startsWith("/imagine ")) {
+            sTitle = "🎨 " + prompt.slice(9).trim().slice(0, 30);
+          } else if (prompt.startsWith("/translate ")) {
+            sTitle = "🌐 " + prompt.slice(11).trim().slice(0, 30);
+          }
           const sRes = await fetch("/api/sessions", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: prompt.slice(0, 32) })
+            body: JSON.stringify({ title: sTitle })
           });
           const sData = await sRes.json();
           currentSessionId = sData.id;
@@ -2574,18 +2643,23 @@ export function getHTML(env = {}) {
           signal: activeAbortController.signal
         });
 
-        // Track guest remaining header
+        // Track guest remaining header only for guests
         const remainingHeader = res.headers.get("x-guest-remaining");
-        if (remainingHeader !== null) {
-          guestRemaining = parseInt(remainingHeader, 10);
-          renderGuestUI();
+        if (isGuest && remainingHeader !== null && remainingHeader !== "unlimited") {
+          const parsed = parseInt(remainingHeader, 10);
+          if (!isNaN(parsed)) {
+            guestRemaining = parsed;
+            renderGuestUI();
+          }
         }
 
         if (!res.ok) {
           const errData = await res.json().catch(() => ({}));
           const errMsg = errData.error || "Generation error";
           body.innerHTML = '<span style="color:var(--red);">⚠️ ' + escapeHtml(errMsg) + '</span>';
-          if (res.status === 403 && (errMsg.includes("limit") || errMsg.includes("guest"))) {
+          if ((res.status === 401 || res.status === 403) && (errData.guest_exhausted || errMsg.includes("limit") || errMsg.includes("guest") || errMsg.includes("queries"))) {
+            guestRemaining = 0;
+            renderGuestUI();
             showAuthModal(true);
           }
           finalizeGeneration();
@@ -2614,7 +2688,7 @@ export function getHTML(env = {}) {
               const parsed = JSON.parse(dataStr);
               if (parsed.response) {
                 accumulatedText += parsed.response;
-                body.innerHTML = marked.parse(DOMPurify.sanitize(accumulatedText));
+                body.innerHTML = DOMPurify.sanitize(marked.parse(accumulatedText));
                 wrapTables(body);
                 scrollToBottom();
               }
@@ -2623,9 +2697,10 @@ export function getHTML(env = {}) {
         }
 
         if (accumulatedText) {
-          body.innerHTML = marked.parse(DOMPurify.sanitize(accumulatedText));
+          body.innerHTML = DOMPurify.sanitize(marked.parse(accumulatedText));
           wrapTables(body);
           enhanceCodeBlocks(body);
+          enhanceImages(body);
           renderMathInDOM(body);
           currentMessages.push({ role: "assistant", content: accumulatedText });
 
@@ -2656,6 +2731,11 @@ export function getHTML(env = {}) {
     }
 
     async function handleFluxGeneration(promptText) {
+      if (isGuest && guestRemaining <= 0) {
+        showToast("You have used your 3 free guest queries for today. Please sign in to continue.", "warning");
+        showAuthModal(true);
+        return;
+      }
       appendMessageDOM("assistant", "🎨 Generating image...");
       try {
         const res = await fetch("/api/imagine", {
@@ -2665,8 +2745,14 @@ export function getHTML(env = {}) {
         });
 
         const remainingHeader = res.headers.get("x-guest-remaining");
-        if (remainingHeader !== null) {
-          guestRemaining = parseInt(remainingHeader, 10);
+        if (isGuest && remainingHeader !== null && remainingHeader !== "unlimited") {
+          const parsed = parseInt(remainingHeader, 10);
+          if (!isNaN(parsed)) {
+            guestRemaining = parsed;
+            renderGuestUI();
+          }
+        } else if (isGuest && res.ok) {
+          guestRemaining = Math.max(0, guestRemaining - 1);
           renderGuestUI();
         }
 
@@ -2680,7 +2766,11 @@ export function getHTML(env = {}) {
           ].join('');
         } else {
           lastRow.querySelector(".assistant-body").innerHTML = '<span style="color:var(--red);">⚠️ ' + escapeHtml(data.error || "Image generation failed") + '</span>';
-          if (res.status === 403) showAuthModal(true);
+          if ((res.status === 401 || res.status === 403) && (data.guest_exhausted || (data.error && (data.error.includes("guest") || data.error.includes("limit"))))) {
+            guestRemaining = 0;
+            renderGuestUI();
+            showAuthModal(true);
+          }
         }
       } catch (e) {
         showToast("Image generation failed", "error");
@@ -2688,6 +2778,11 @@ export function getHTML(env = {}) {
     }
 
     async function handleIndicTranslation(args) {
+      if (isGuest && guestRemaining <= 0) {
+        showToast("You have used your 3 free guest queries for today. Please sign in to continue.", "warning");
+        showAuthModal(true);
+        return;
+      }
       const parts = args.split(" ");
       const targetLang = parts[0] || "hin_Deva";
       const textToTranslate = parts.slice(1).join(" ") || "Hello";
@@ -2699,6 +2794,19 @@ export function getHTML(env = {}) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text: textToTranslate, target_lang: targetLang })
         });
+
+        const remainingHeader = res.headers.get("x-guest-remaining");
+        if (isGuest && remainingHeader !== null && remainingHeader !== "unlimited") {
+          const parsed = parseInt(remainingHeader, 10);
+          if (!isNaN(parsed)) {
+            guestRemaining = parsed;
+            renderGuestUI();
+          }
+        } else if (isGuest && res.ok) {
+          guestRemaining = Math.max(0, guestRemaining - 1);
+          renderGuestUI();
+        }
+
         const data = await res.json();
         const chatMaxWidth = document.getElementById("chatMaxWidth");
         const lastRow = chatMaxWidth.lastElementChild;
@@ -2706,6 +2814,11 @@ export function getHTML(env = {}) {
           lastRow.querySelector(".assistant-body").innerHTML = '<div style="font-size:1.05rem; color:var(--text-main); padding:6px 0;">' + escapeHtml(data.translation) + '</div>';
         } else {
           lastRow.querySelector(".assistant-body").innerHTML = '<span style="color:var(--red);">⚠️ ' + escapeHtml(data.error || "Translation failed") + '</span>';
+          if ((res.status === 401 || res.status === 403) && (data.guest_exhausted || (data.error && (data.error.includes("guest") || data.error.includes("limit"))))) {
+            guestRemaining = 0;
+            renderGuestUI();
+            showAuthModal(true);
+          }
         }
       } catch (e) {
         showToast("Translation error", "error");
@@ -2988,7 +3101,7 @@ export function getHTML(env = {}) {
         const res = await fetch("/api/briefing/today");
         const data = await res.json();
         if (data && data.summary) {
-          content.innerHTML = marked.parse(DOMPurify.sanitize(data.summary));
+          content.innerHTML = DOMPurify.sanitize(marked.parse(data.summary));
           wrapTables(content);
         } else {
           content.innerHTML = '<p style="color:var(--text-muted);">No briefing recorded for today yet. Click <strong>Refresh Briefing</strong> below to generate the daily briefing.</p>';
@@ -3006,7 +3119,7 @@ export function getHTML(env = {}) {
         const data = await res.json();
         const summary = (data.briefing && data.briefing.summary) || data.summary;
         if (summary) {
-          content.innerHTML = marked.parse(DOMPurify.sanitize(summary));
+          content.innerHTML = DOMPurify.sanitize(marked.parse(summary));
           wrapTables(content);
           showToast("Briefing updated", "success");
         } else {

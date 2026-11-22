@@ -123,7 +123,8 @@ async function checkUserQuota(user, env) {
         used,
         budget: 3,
         reason: "You have used your 3 free guest queries for today. Please sign in with Google or Master Password to continue.",
-        require_auth: true
+        require_auth: true,
+        guest_exhausted: true,
       };
     }
     return { allowed: true, used, budget: 3, is_guest: true };
@@ -228,16 +229,34 @@ async function recordGuestUsage(ipHash, today, env) {
   }
 }
 
-function jsonResponse(data, status = 200, extraHeaders = {}) {
+function jsonResponse(data, status = 200, extraHeaders = {}, cookies = []) {
+  const headers = new Headers({
+    "Content-Type": "application/json; charset=utf-8",
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, X-Auth-Password, X-Auth-Token, Authorization",
+  });
+  if (extraHeaders) {
+    for (const [k, v] of Object.entries(extraHeaders)) {
+      if (k.toLowerCase() === "set-cookie") {
+        if (Array.isArray(v)) {
+          for (const c of v) headers.append("Set-Cookie", c);
+        } else {
+          headers.append("Set-Cookie", v);
+        }
+      } else {
+        headers.set(k, v);
+      }
+    }
+  }
+  if (Array.isArray(cookies)) {
+    for (const c of cookies) {
+      if (c) headers.append("Set-Cookie", c);
+    }
+  }
   return new Response(JSON.stringify(data), {
     status,
-    headers: {
-      "Content-Type": "application/json; charset=utf-8",
-      "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-      "Access-Control-Allow-Headers": "Content-Type, X-Auth-Password, X-Auth-Token, Authorization",
-      ...extraHeaders,
-    },
+    headers,
   });
 }
 
@@ -662,17 +681,16 @@ export default {
         getJwtSecret(env)
       );
 
-      const cookieHeaders = [
+      const cookieList = [
         `auth_password=${encodeURIComponent(password)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`,
         `auth_token=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`,
-      ].join(", ");
+      ];
 
       return jsonResponse(
         { ok: true, user: masterUser, token, message: "Welcome back, Mehkesh. Master access granted." },
         200,
-        {
-          "Set-Cookie": cookieHeaders,
-        }
+        {},
+        cookieList
       );
     }
 
@@ -799,17 +817,25 @@ export default {
           },
         },
         200,
-        {
-          "Set-Cookie": `auth_token=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`,
-        }
+        {},
+        [
+          `auth_token=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`,
+          "auth_password=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
+        ]
       );
     }
 
     // 7. Logout Endpoint
     if (method === "POST" && pathname === "/api/auth/logout") {
-      return jsonResponse({ ok: true, message: "Logged out" }, 200, {
-        "Set-Cookie": "auth_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax, auth_password=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
-      });
+      return jsonResponse(
+        { ok: true, message: "Logged out" },
+        200,
+        {},
+        [
+          "auth_token=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
+          "auth_password=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
+        ]
+      );
     }
 
     // ========================================================================
@@ -820,13 +846,14 @@ export default {
       let isGuest = false;
 
       if (!user) {
-        // Guest mode allows /api/chat, /api/sessions, /api/transcribe, /api/audio/transcribe, /api/imagine up to 3 queries/day
+        // Guest mode allows /api/chat, /api/sessions, /api/transcribe, /api/audio/transcribe, /api/imagine, /api/translate up to 3 queries/day
         const allowedGuestPaths = [
           "/api/chat",
           "/api/sessions",
           "/api/transcribe",
           "/api/audio/transcribe",
           "/api/imagine",
+          "/api/translate",
         ];
         const isGuestPath = allowedGuestPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
@@ -1114,11 +1141,21 @@ export default {
       if (pathname === "/api/imagine" && method === "POST") {
         if (!env.AI) return jsonResponse({ error: "Workers AI is not bound" }, 500);
         const quota = await checkUserQuota(user, env);
-        if (!quota.allowed) return jsonResponse({ error: quota.reason }, 429);
+        if (!quota.allowed) {
+          return jsonResponse({
+            error: quota.reason,
+            require_auth: quota.require_auth || false,
+            guest_exhausted: Boolean(user.is_guest)
+          }, user.is_guest ? 401 : 429);
+        }
 
         const body = await request.json().catch(() => ({}));
         const prompt = body.prompt?.trim();
         if (!prompt) return jsonResponse({ error: "Prompt is required" }, 400);
+
+        if (user.is_guest) {
+          await recordGuestUsage(user.ip_hash, user.today, env);
+        }
 
         try {
           const res = await env.AI.run(MODELS.IMAGE_GEN, { prompt, steps: 4 });
@@ -1275,13 +1312,23 @@ export default {
       if (pathname === "/api/translate" && method === "POST") {
         if (!env.AI) return jsonResponse({ error: "Workers AI is not bound" }, 500);
         const quota = await checkUserQuota(user, env);
-        if (!quota.allowed) return jsonResponse({ error: quota.reason }, 429);
+        if (!quota.allowed) {
+          return jsonResponse({
+            error: quota.reason,
+            require_auth: quota.require_auth || false,
+            guest_exhausted: Boolean(user.is_guest)
+          }, user.is_guest ? 401 : 429);
+        }
 
         const body = await request.json().catch(() => ({}));
         const text = body.text?.trim();
         const targetLang = (body.target_lang || "hin_Deva").trim();
 
         if (!text) return jsonResponse({ error: "Text is required" }, 400);
+
+        if (user.is_guest) {
+          await recordGuestUsage(user.ip_hash, user.today, env);
+        }
 
         try {
           const res = await env.AI.run(MODELS.TRANSLATE, {
@@ -1291,7 +1338,24 @@ export default {
           });
 
           const sessionId = body.session_id;
-          const translatedResult = res.translation || res.translated_text || String(res);
+          let translatedResult = "";
+          if (typeof res === "string") {
+            translatedResult = res;
+          } else if (res && typeof res === "object") {
+            if (typeof res.translation === "string") translatedResult = res.translation;
+            else if (typeof res.translated_text === "string") translatedResult = res.translated_text;
+            else if (typeof res.response === "string") translatedResult = res.response;
+            else if (typeof res.result === "string") translatedResult = res.result;
+            else if (typeof res.text === "string") translatedResult = res.text;
+            else if (typeof res.output === "string") translatedResult = res.output;
+            else if (Array.isArray(res.translations) && typeof res.translations[0] === "string") translatedResult = res.translations[0];
+            else if (Array.isArray(res.translations) && res.translations[0]?.translated_text) translatedResult = res.translations[0].translated_text;
+            else if (Array.isArray(res.translated_text) && typeof res.translated_text[0] === "string") translatedResult = res.translated_text[0];
+            else if (Array.isArray(res.translated_text) && res.translated_text[0]?.text) translatedResult = res.translated_text[0].text;
+            else translatedResult = JSON.stringify(res);
+          } else {
+            translatedResult = String(res);
+          }
 
           if (env.DB) {
             ctx.waitUntil(
@@ -1345,7 +1409,11 @@ export default {
 
         const quota = await checkUserQuota(user, env);
         if (!quota.allowed) {
-          return jsonResponse({ error: quota.reason }, 429);
+          return jsonResponse({
+            error: quota.reason,
+            require_auth: quota.require_auth || false,
+            guest_exhausted: Boolean(user.is_guest)
+          }, user.is_guest ? 401 : 429);
         }
 
         const body = await request.json().catch(() => ({}));
@@ -1357,6 +1425,11 @@ export default {
 
         if (!Array.isArray(messages) || messages.length === 0) {
           return jsonResponse({ error: "Messages array is required" }, 400);
+        }
+
+        // Record guest query immediately upfront to prevent streaming race conditions
+        if (user.is_guest) {
+          await recordGuestUsage(user.ip_hash, user.today, env);
         }
 
         const latestUserMessage = messages[messages.length - 1]?.content || "";
@@ -1505,10 +1578,6 @@ Always maintain the prestigious persona of Mehkesh AI. When providing code or te
                   if (!user.is_guest) {
                     await extractAndSaveMemory(env, currentUserId, latestUserMessage, accumulatedResponse);
                   }
-                }
-
-                if (user.is_guest) {
-                  await recordGuestUsage(user.ip_hash, user.today, env);
                 }
               } catch (bgErr) {
                 console.error("Background stream logging error:", bgErr);
