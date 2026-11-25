@@ -3,13 +3,13 @@ import { BRAND_LOGO_SVG } from "./logo.js";
 import { signJwt, verifyJwt } from "./jwt.js";
 
 // ============================================================================
-// AI Models Configuration (Workers AI 100% Free Edge Tier)
+// AI Models Configuration (Workers AI 100% Free Edge Tier - 10,000 Neurons/day)
 // ============================================================================
 const MODELS = {
   GENERAL: "@cf/meta/llama-4-scout-17b-16e-instruct",
-  CODER: "@cf/qwen/qwen2.5-coder-32b-instruct",
-  REASONING: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-  FAST_EXTRACT: "@cf/meta/llama-3.1-8b-instruct",
+  CODER: "@cf/qwen/qwen3-30b-a3b-fp8",
+  REASONING: "@cf/openai/gpt-oss-20b",
+  FAST_EXTRACT: "@cf/zai-org/glm-4.7-flash",
   VISION: "@cf/meta/llama-4-scout-17b-16e-instruct",
   IMAGE_GEN: "@cf/black-forest-labs/flux-1-schnell",
   STT: "@cf/openai/whisper-large-v3-turbo",
@@ -281,7 +281,7 @@ function resolveModel({ hasImage, prompt, override }) {
     /[{};<>\[\]=]{2,}/,
   ];
   if (codeSignals.some((regex) => regex.test(text))) {
-    return { model: MODELS.CODER, reason: "Qwen 2.5 Coder (32B)" };
+    return { model: MODELS.CODER, reason: "Qwen 3 Coder/MoE (30B-A3B)" };
   }
 
   // Deep reasoning & Math queries
@@ -290,7 +290,7 @@ function resolveModel({ hasImage, prompt, override }) {
     /\b(logic puzzle|system architecture|trade-offs|pros and cons in detail|deep analysis|quantum)\b/,
   ];
   if (reasoningSignals.some((regex) => regex.test(text))) {
-    return { model: MODELS.REASONING, reason: "Llama 3.3 70B (Fast Reasoning)" };
+    return { model: MODELS.REASONING, reason: "GPT-OSS 20B (Deep Reasoning)" };
   }
 
   return { model: MODELS.GENERAL, reason: "Llama 4 Scout (17B-16E MoE)" };
@@ -436,6 +436,11 @@ If NO durable or notable fact was shared, respond ONLY with: {"fact": null}`;
     if (parsed && parsed.fact && typeof parsed.fact === "string" && parsed.fact.trim().length > 6) {
       const fact = parsed.fact.trim();
       const category = parsed.category || "general";
+      const existing = await env.DB.prepare(
+        "SELECT id FROM memories WHERE user_id = ? AND LOWER(fact) = LOWER(?) LIMIT 1"
+      ).bind(userId, fact).first();
+      if (existing) return;
+
       const memId = "mem_" + Date.now();
 
       await env.DB.prepare(
@@ -682,8 +687,8 @@ export default {
       );
 
       const cookieList = [
-        `auth_password=${encodeURIComponent(password)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`,
         `auth_token=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=2592000`,
+        "auth_password=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax",
       ];
 
       return jsonResponse(
@@ -846,7 +851,7 @@ export default {
       let isGuest = false;
 
       if (!user) {
-        // Guest mode allows /api/chat, /api/sessions, /api/transcribe, /api/audio/transcribe, /api/imagine, /api/translate up to 3 queries/day
+        // Guest mode allows /api/chat, /api/sessions, /api/transcribe, /api/audio/transcribe, /api/imagine, /api/translate, /api/suggestions up to 3 queries/day
         const allowedGuestPaths = [
           "/api/chat",
           "/api/sessions",
@@ -854,6 +859,7 @@ export default {
           "/api/audio/transcribe",
           "/api/imagine",
           "/api/translate",
+          "/api/suggestions",
         ];
         const isGuestPath = allowedGuestPaths.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
@@ -903,20 +909,29 @@ export default {
       const isAdmin = user.role === "admin";
 
       // ----------------------------------------------------------------------
-      // Profile Management
+      // Profile & Custom Instructions Management (Per User)
       // ----------------------------------------------------------------------
       if (pathname === "/api/profile") {
         if (!env.DB) return jsonResponse({ error: "D1 database is not bound" }, 500);
 
         if (method === "GET") {
           try {
-            const profile = await env.DB.prepare("SELECT * FROM profile WHERE id = 'me'").first();
-            return jsonResponse(profile || {
-              display_name: user.full_name || "Mehkesh",
-              custom_instructions: "You are Mehkesh AI, a sharp, proactive AI assistant.",
+            if (isAdmin) {
+              const profile = await env.DB.prepare("SELECT * FROM profile WHERE id = 'me'").first();
+              return jsonResponse(profile || {
+                display_name: user.full_name || "Mehkesh",
+                custom_instructions: "You are Mehkesh AI, a sharp, proactive AI assistant.",
+              });
+            }
+            const cfg = await env.DB.prepare(
+              "SELECT value FROM system_config WHERE key = ?"
+            ).bind("user_instructions_" + currentUserId).first();
+            return jsonResponse({
+              display_name: user.full_name,
+              custom_instructions: cfg?.value || "",
             });
           } catch (e) {
-            return jsonResponse({ display_name: user.full_name || "Mehkesh" });
+            return jsonResponse({ display_name: user.full_name || "Mehkesh", custom_instructions: "" });
           }
         }
 
@@ -934,10 +949,121 @@ export default {
                 custom_instructions = excluded.custom_instructions,
                 updated_at = CURRENT_TIMESTAMP
             `).bind(displayName, customInstructions).run();
+          } else {
+            await env.DB.prepare(`
+              INSERT INTO system_config (key, value, description, updated_at)
+              VALUES (?, ?, 'Per-user custom instructions', CURRENT_TIMESTAMP)
+              ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP
+            `).bind("user_instructions_" + currentUserId, customInstructions).run();
           }
 
           return jsonResponse({ ok: true, message: "Profile updated" });
         }
+      }
+
+      // ----------------------------------------------------------------------
+      // Dynamic History-Based Starter Suggestions (Gemini-style)
+      // ----------------------------------------------------------------------
+      if (pathname === "/api/suggestions" && method === "GET") {
+        const defaultSuggestions = [
+          {
+            tag: "Code Architecture",
+            title: "Build a serverless API with SQLite database",
+            prompt: "Write an optimized Cloudflare Worker API with rate limiting and SQLite D1 caching.",
+            mode: "@cf/qwen/qwen3-30b-a3b-fp8",
+            label: "💻 Code & Tech",
+          },
+          {
+            tag: "System Analysis",
+            title: "Compare latency trade-offs of edge vs centralized servers",
+            prompt: "Compare edge serverless architecture vs containerized microservices. Detail trade-offs in cold-starts, latency, and operational cost.",
+            mode: "@cf/openai/gpt-oss-20b",
+            label: "🧠 Deep Reasoning",
+          },
+          {
+            tag: "Create Image",
+            title: "/imagine photorealistic obsidian workstation with ambient violet lighting",
+            prompt: "/imagine photorealistic obsidian workstation with ambient violet lighting",
+            mode: "auto",
+            label: "⚡ Mehkesh Auto",
+          },
+          {
+            tag: "Translate",
+            title: "/translate hin_Deva Translate technical docs into Hindi",
+            prompt: "/translate hin_Deva Good morning team! Today we are deploying our personal AI assistant globally.",
+            mode: "auto",
+            label: "⚡ Mehkesh Auto",
+          },
+        ];
+
+        if (user.is_guest || !env.DB || !env.AI) {
+          return jsonResponse({ suggestions: defaultSuggestions, dynamic: false });
+        }
+
+        try {
+          const [sessRes, memRes] = await Promise.all([
+            env.DB.prepare(
+              "SELECT title FROM sessions WHERE user_id = ? ORDER BY updated_at DESC LIMIT 6"
+            ).bind(currentUserId).all(),
+            env.DB.prepare(
+              "SELECT fact FROM memories WHERE user_id = ? ORDER BY created_at DESC LIMIT 6"
+            ).bind(currentUserId).all(),
+          ]);
+
+          const recentTitles = (sessRes?.results || []).map((s) => s.title).filter(Boolean);
+          const userFacts = (memRes?.results || []).map((m) => m.fact).filter(Boolean);
+
+          if (recentTitles.length === 0 && userFacts.length === 0) {
+            return jsonResponse({ suggestions: defaultSuggestions, dynamic: false });
+          }
+
+          const suggestPrompt = `Based on the user's recent chat topics and preferences, generate 4 concise, actionable starter prompt cards for their AI assistant home screen.
+Recent chats: ${recentTitles.join(" | ") || "None"}
+Memories: ${userFacts.join(" | ") || "None"}
+
+Rules:
+- Return ONLY a JSON array of 4 objects: [{"tag":"2-3 word category","title":"short card subtitle under 65 chars","prompt":"full actionable prompt to send when clicked","kind":"code|reason|general|imagine"}]
+- Make at least 2 directly build on their recent topics or memories, 1 analytical/deep dive, and 1 creative or /imagine idea.
+- No markdown fences, valid JSON array only.`;
+
+          const aiRes = await env.AI.run(MODELS.FAST_EXTRACT, {
+            messages: [{ role: "user", content: suggestPrompt }],
+            max_tokens: 450,
+          });
+
+          const raw = (aiRes?.response || "").replace(/```json/g, "").replace(/```/g, "").trim();
+          const arrMatch = raw.match(/\[[\s\S]*\]/);
+          if (arrMatch) {
+            const parsed = JSON.parse(arrMatch[0]);
+            if (Array.isArray(parsed) && parsed.length >= 2) {
+              const modeMap = {
+                code: { mode: MODELS.CODER, label: "💻 Code & Tech" },
+                reason: { mode: MODELS.REASONING, label: "🧠 Deep Reasoning" },
+                imagine: { mode: "auto", label: "⚡ Mehkesh Auto" },
+                general: { mode: "auto", label: "⚡ Mehkesh Auto" },
+              };
+              const normalized = parsed.slice(0, 4).map((item) => {
+                const m = modeMap[item.kind] || modeMap.general;
+                let promptText = String(item.prompt || item.title || "").trim();
+                if (item.kind === "imagine" && !promptText.startsWith("/imagine ")) {
+                  promptText = "/imagine " + promptText;
+                }
+                return {
+                  tag: String(item.tag || "Suggested").slice(0, 28),
+                  title: String(item.title || promptText).slice(0, 80),
+                  prompt: promptText,
+                  mode: m.mode,
+                  label: m.label,
+                };
+              });
+              return jsonResponse({ suggestions: normalized, dynamic: true });
+            }
+          }
+        } catch (e) {
+          // Graceful fallback to defaults
+        }
+
+        return jsonResponse({ suggestions: defaultSuggestions, dynamic: false });
       }
 
       // ----------------------------------------------------------------------
@@ -1421,7 +1547,11 @@ export default {
         const messages = body.messages;
         const model_override = body.model_override || body.model;
         const image_data = body.image_data || body.image;
-        const has_image = Boolean(body.has_image || image_data);
+        const images_list = Array.isArray(body.images)
+          ? body.images.filter((u) => typeof u === "string" && u.startsWith("data:image/"))
+          : (typeof image_data === "string" && image_data.startsWith("data:image/") ? [image_data] : []);
+        const has_image = Boolean(body.has_image || images_list.length > 0);
+        const is_regenerate = Boolean(body.is_regenerate);
 
         if (!Array.isArray(messages) || messages.length === 0) {
           return jsonResponse({ error: "Messages array is required" }, 400);
@@ -1449,14 +1579,22 @@ export default {
 
         let memoriesContext = "";
         let todayBriefingContext = "";
+        let userCustomPrefs = "";
 
         if (env.DB) {
           try {
             const today = new Date().toISOString().split("T")[0];
-            const [memRows, briefRow] = await Promise.all([
+            const [memRows, briefRow, prefRow] = await Promise.all([
               env.DB.prepare("SELECT fact FROM memories WHERE user_id = ? ORDER BY created_at DESC LIMIT 8").bind(currentUserId).all(),
               env.DB.prepare("SELECT summary FROM daily_briefings WHERE briefing_date = ?").bind(today).first(),
+              isAdmin
+                ? env.DB.prepare("SELECT custom_instructions FROM profile WHERE id = 'me'").first()
+                : env.DB.prepare("SELECT value as custom_instructions FROM system_config WHERE key = ?").bind("user_instructions_" + currentUserId).first(),
             ]);
+
+            if (prefRow?.custom_instructions) {
+              userCustomPrefs = "\nUser custom instructions:\n" + prefRow.custom_instructions.slice(0, 1000);
+            }
 
             if (memRows?.results?.length) {
               memoriesContext = "\nUser preferences & memories:\n" + memRows.results.map((r) => "- " + r.fact).join("\n");
@@ -1468,12 +1606,33 @@ export default {
           } catch (e) {}
         }
 
-        const SYSTEM_PROMPT = `${customInstructions}${memoriesContext}${todayBriefingContext}
+        const SYSTEM_PROMPT = `${customInstructions}${userCustomPrefs}${memoriesContext}${todayBriefingContext}
 Always maintain the prestigious persona of Mehkesh AI. When providing code or technical solutions, use markdown code blocks with exact language specified.`;
 
+        // Sliding window of last 24 messages to fit edge context cleanly
         const sanitizedMessages = messages
-          .filter((m) => m && (m.role === "user" || m.role === "assistant"))
-          .map((m) => ({ role: m.role, content: m.content.slice(0, 16000) }));
+          .filter((m) => m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+          .slice(-24)
+          .map((m) => ({ role: m.role, content: m.content.slice(0, 24000) }));
+
+        // Format multimodal vision message using OpenAI-compatible image_url content array
+        // (Required by @cf/meta/llama-4-scout-17b-16e-instruct on Cloudflare Workers AI)
+        if (has_image && images_list.length > 0 && sanitizedMessages.length > 0) {
+          const lastIdx = sanitizedMessages.length - 1;
+          if (sanitizedMessages[lastIdx].role === "user") {
+            const textPart = sanitizedMessages[lastIdx].content || "Describe and analyze this image in detail.";
+            sanitizedMessages[lastIdx] = {
+              role: "user",
+              content: [
+                { type: "text", text: textPart },
+                ...images_list.slice(0, 4).map((url) => ({
+                  type: "image_url",
+                  image_url: { url },
+                })),
+              ],
+            };
+          }
+        }
 
         const fullMessages = [
           { role: "system", content: SYSTEM_PROMPT },
@@ -1481,25 +1640,11 @@ Always maintain the prestigious persona of Mehkesh AI. When providing code or te
         ];
 
         try {
-          let aiInput = {
+          const aiInput = {
             messages: fullMessages,
             stream: true,
             max_tokens: 2048,
           };
-
-          if (has_image && image_data) {
-            try {
-              const rawBase64 = image_data.replace(/^data:image\/\w+;base64,/, "");
-              const binaryString = atob(rawBase64);
-              const imageBytes = new Uint8Array(binaryString.length);
-              for (let i = 0; i < binaryString.length; i++) {
-                imageBytes[i] = binaryString.charCodeAt(i);
-              }
-              aiInput.image = [...imageBytes];
-            } catch (imgErr) {
-              console.error("Image decode error:", imgErr);
-            }
-          }
 
           let stream;
           try {
@@ -1534,7 +1679,10 @@ Always maintain the prestigious persona of Mehkesh AI. When providing code or te
                     if (dataStr === "[DONE]") break;
                     try {
                       const parsed = JSON.parse(dataStr);
-                      if (parsed.response) accumulatedResponse += parsed.response;
+                      const chunk = parsed.response ?? parsed.choices?.[0]?.delta?.content;
+                      if (chunk !== undefined && chunk !== null && chunk !== "") {
+                        accumulatedResponse += String(chunk);
+                      }
                     } catch (e) {
                       if (dataStr) accumulatedResponse += dataStr;
                     }
@@ -1554,10 +1702,6 @@ Always maintain the prestigious persona of Mehkesh AI. When providing code or te
                       title = CASE WHEN title = 'New Chat' OR title = 'New Session' THEN excluded.title ELSE title END
                   `).bind(session_id, currentUserId, autoTitle);
 
-                  const insertUser = env.DB.prepare(
-                    "INSERT INTO messages (id, session_id, user_id, role, content, model_used, has_media) VALUES (?, ?, ?, ?, ?, ?, ?)"
-                  ).bind("msg_" + now + "_u", session_id, currentUserId, "user", latestUserMessage, chosenModel, has_image ? 1 : 0);
-
                   const insertAssistant = env.DB.prepare(
                     "INSERT INTO messages (id, session_id, user_id, role, content, model_used, has_media) VALUES (?, ?, ?, ?, ?, ?, ?)"
                   ).bind("msg_" + (now + 1) + "_a", session_id, currentUserId, "assistant", accumulatedResponse, chosenModel, 0);
@@ -1566,16 +1710,22 @@ Always maintain the prestigious persona of Mehkesh AI. When providing code or te
                     "INSERT INTO activity_logs (id, user_id, action_type, model_used, approx_neurons) VALUES (?, ?, ?, ?, ?)"
                   ).bind("log_" + now, currentUserId, "chat", chosenModel, 65);
 
+                  const batchOps = [ensureSess];
+                  if (!is_regenerate) {
+                    const insertUser = env.DB.prepare(
+                      "INSERT INTO messages (id, session_id, user_id, role, content, model_used, has_media) VALUES (?, ?, ?, ?, ?, ?, ?)"
+                    ).bind("msg_" + now + "_u", session_id, currentUserId, "user", latestUserMessage, chosenModel, has_image ? 1 : 0);
+                    batchOps.push(insertUser);
+                  }
+                  batchOps.push(insertAssistant, logChat);
+
                   if (typeof env.DB.batch === "function") {
-                    await env.DB.batch([ensureSess, insertUser, insertAssistant, logChat]);
+                    await env.DB.batch(batchOps);
                   } else {
-                    await ensureSess.run();
-                    await insertUser.run();
-                    await insertAssistant.run();
-                    await logChat.run();
+                    for (const op of batchOps) await op.run();
                   }
 
-                  if (!user.is_guest) {
+                  if (!user.is_guest && !is_regenerate) {
                     await extractAndSaveMemory(env, currentUserId, latestUserMessage, accumulatedResponse);
                   }
                 }

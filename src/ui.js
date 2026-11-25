@@ -25,6 +25,12 @@ export function getHTML(env = {}) {
   <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.2/purify.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script>
+    if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    }
+  </script>
 
   <!-- Google Identity Services -->
   <script src="https://accounts.google.com/gsi/client" async defer onload="if(typeof initGoogleSignIn==='function')initGoogleSignIn()"></script>
@@ -478,6 +484,21 @@ export function getHTML(env = {}) {
     }
     .model-dropdown-item:hover { background: var(--bg-surface-hover); }
     .model-dropdown-item.selected { background: rgba(139, 92, 246, 0.15); }
+    .chat-more-wrap { position: relative; }
+    .chat-more-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      right: 0;
+      width: 240px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hover);
+      border-radius: 10px;
+      padding: 6px;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+      z-index: 100;
+    }
+    .chat-more-menu.active { display: block; }
     .model-item-title {
       font-size: 0.82rem;
       font-weight: 600;
@@ -1214,15 +1235,62 @@ export function getHTML(env = {}) {
       font-size: 0.8rem;
     }
 
-    /* Toast */
+    /* Toast (top-right so it never overlaps the Send button) */
     .toast-container {
       position: fixed;
-      bottom: 20px;
+      top: 68px;
       right: 20px;
       display: flex;
       flex-direction: column;
       gap: 8px;
       z-index: 300;
+      pointer-events: none;
+    }
+    .user-attachment-thumbs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    .user-attachment-thumbs img {
+      max-width: 180px;
+      max-height: 140px;
+      border-radius: 8px;
+      border: 1px solid var(--border-hover);
+      object-fit: cover;
+    }
+    .user-attachment-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background: rgba(139, 92, 246, 0.14);
+      border: 1px solid rgba(139, 92, 246, 0.3);
+      font-size: 0.76rem;
+      color: var(--text-main);
+    }
+    .thinking-block {
+      margin: 8px 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: rgba(139, 92, 246, 0.05);
+      overflow: hidden;
+    }
+    .thinking-block summary {
+      padding: 8px 12px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      cursor: pointer;
+      user-select: none;
+    }
+    .thinking-block-content {
+      padding: 8px 12px 12px;
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      white-space: pre-wrap;
     }
     .toast {
       background: var(--bg-surface);
@@ -1253,6 +1321,32 @@ export function getHTML(env = {}) {
       .shortcut-tag { display: none !important; }
       .chat-scroll-area { padding-bottom: 120px; }
       .composer-dock { padding: 0 10px 10px; }
+    }
+
+    @media print {
+      html, body, .app-root, .main-viewport, .chat-scroll-area {
+        height: auto !important;
+        overflow: visible !important;
+        background: #ffffff !important;
+        color: #0f172a !important;
+      }
+      .sidebar, .sidebar-backdrop, .topbar, .composer-dock, .assistant-action-bar, .user-edit-btn, .toast-container, .modal-backdrop {
+        display: none !important;
+      }
+      .chat-scroll-area { padding: 0 !important; }
+      .chat-max-width { max-width: 100% !important; }
+      .user-bubble {
+        background: #f1f5f9 !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+      }
+      .assistant-body, .assistant-body * { color: #0f172a !important; }
+      pre, pre code {
+        background: #f8fafc !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
+        white-space: pre-wrap !important;
+      }
     }
   </style>
 </head>
@@ -1352,21 +1446,21 @@ export function getHTML(env = {}) {
             <span style="font-size:0.65rem; color:var(--text-dim);">▾</span>
 
             <div class="model-dropdown-menu" id="modelDropdownMenu">
-              <div class="model-dropdown-item selected" onclick="selectModel('auto', '⚡ Mehkesh Auto')">
+              <div class="model-dropdown-item selected" onclick="selectModel('auto', '⚡ Mehkesh Auto', event)">
                 <div class="model-item-title"><span>Mehkesh Auto</span> <span style="color:var(--purple); font-size:0.65rem;">DEFAULT</span></div>
-                <div class="model-item-sub">Fast and intelligent for daily requests</div>
+                <div class="model-item-sub">Smart routing across Llama 4, Qwen 3 & GPT-OSS</div>
               </div>
-              <div class="model-dropdown-item" onclick="selectModel('@cf/qwen/qwen2.5-coder-32b-instruct', '💻 Code & Tech')">
-                <div class="model-item-title"><span>Code & Tech</span> <span style="color:var(--cyan); font-size:0.65rem;">PROGRAMMING</span></div>
+              <div class="model-dropdown-item" onclick="selectModel('@cf/qwen/qwen3-30b-a3b-fp8', '💻 Code & Tech', event)">
+                <div class="model-item-title"><span>Code & Tech</span> <span style="color:var(--cyan); font-size:0.65rem;">QWEN 3</span></div>
                 <div class="model-item-sub">Specialized software engineering & architecture</div>
               </div>
-              <div class="model-dropdown-item" onclick="selectModel('@cf/meta/llama-3.3-70b-instruct-fp8-fast', '🧠 Deep Reasoning')">
-                <div class="model-item-title"><span>Deep Reasoning</span> <span style="color:var(--purple); font-size:0.65rem;">ANALYSIS</span></div>
+              <div class="model-dropdown-item" onclick="selectModel('@cf/openai/gpt-oss-20b', '🧠 Deep Reasoning', event)">
+                <div class="model-item-title"><span>Deep Reasoning</span> <span style="color:var(--purple); font-size:0.65rem;">GPT-OSS</span></div>
                 <div class="model-item-sub">In-depth logic, complex decisions, and analysis</div>
               </div>
-              <div class="model-dropdown-item" onclick="selectModel('@cf/black-forest-labs/flux-1-schnell', '🎨 Image Studio')">
-                <div class="model-item-title"><span>Image Studio</span> <span style="color:#f59e0b; font-size:0.65rem;">VISUAL</span></div>
-                <div class="model-item-sub">Generate images from text descriptions</div>
+              <div class="model-dropdown-item" onclick="selectModel('@cf/black-forest-labs/flux-1-schnell', '🎨 Image Studio', event)">
+                <div class="model-item-title"><span>Image Studio</span> <span style="color:#f59e0b; font-size:0.65rem;">FLUX.1</span></div>
+                <div class="model-item-sub">Generate images directly from text descriptions</div>
               </div>
             </div>
           </div>
@@ -1392,6 +1486,23 @@ export function getHTML(env = {}) {
           <button class="icon-btn" onclick="startNewChat()" title="New chat" aria-label="Start new chat">
             ＋
           </button>
+
+          <!-- Chat Options Menu (⋯) -->
+          <div class="chat-more-wrap" id="chatMoreWrap">
+            <button class="icon-btn" id="chatMoreBtn" onclick="toggleChatMoreMenu(event)" title="Export & Chat Options" aria-label="Chat options" style="font-weight:700; font-size:1.1rem; letter-spacing:1px;">
+              ⋮
+            </button>
+            <div class="chat-more-menu" id="chatMoreMenu">
+              <div class="model-dropdown-item" onclick="exportChatAsPDF(); closeChatMoreMenu();">
+                <div class="model-item-title"><span>📄 Export as PDF</span></div>
+                <div class="model-item-sub">Save this conversation as a clean PDF</div>
+              </div>
+              <div class="model-dropdown-item" onclick="exportCurrentChat(); closeChatMoreMenu();">
+                <div class="model-item-title"><span>⬇ Export .md</span></div>
+                <div class="model-item-sub">Download as a Markdown file</div>
+              </div>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -1470,7 +1581,7 @@ export function getHTML(env = {}) {
             aria-label="Message Mehkesh AI"
           ></textarea>
 
-          <input type="file" id="fileInput" accept="image/*,.txt,.py,.js,.ts,.jsx,.tsx,.json,.csv,.md,.sql,.html,.css,.xml,.yml,.yaml,.sh" style="display:none;" aria-label="Attach file or screenshot">
+          <input type="file" id="fileInput" multiple accept="image/*,.pdf,.txt,.py,.js,.ts,.jsx,.tsx,.json,.csv,.md,.sql,.html,.css,.xml,.yml,.yaml,.sh,.log" style="display:none;" aria-label="Attach file or screenshot">
 
           <!-- Bottom Actions -->
           <div class="composer-toolbar">
@@ -1556,6 +1667,14 @@ export function getHTML(env = {}) {
 
         <label class="form-label">Email</label>
         <input type="text" id="settingsEmailInput" class="form-input" disabled>
+
+        <div id="customInstructionsSection" style="display:none;">
+          <label class="form-label">Custom Instructions (Personalized AI Behavior)</label>
+          <textarea id="customInstructionsInput" class="form-input" rows="3" placeholder="e.g. Always reply concisely with TypeScript examples..."></textarea>
+          <div style="display:flex; justify-content:flex-end; margin-top:-8px; margin-bottom:14px;">
+            <button class="primary-btn" style="padding:6px 12px; font-size:0.78rem;" onclick="saveCustomInstructions()">Save Instructions</button>
+          </div>
+        </div>
 
         <label class="form-label">Theme Preference</label>
         <div style="display:flex; gap:8px; margin-top:6px; margin-bottom:14px;">
@@ -1668,8 +1787,9 @@ export function getHTML(env = {}) {
     let currentMessages = [];
     let isGenerating = false;
     let activeAbortController = null;
-    let attachedImageData = null;
-    let attachedDocument = null;
+    let attachedImages = [];
+    let attachedDocuments = [];
+    let dynamicSuggestions = [];
     let selectedModel = "auto";
     let mediaRecorder = null;
     let audioChunks = [];
@@ -1693,12 +1813,13 @@ export function getHTML(env = {}) {
       const emptyHero = document.getElementById("emptyHero");
       if (emptyHero) {
         emptyHero.addEventListener("click", (e) => {
-          const card = e.target.closest("[data-starter]");
-          if (card && card.dataset.starter) triggerStarterPrompt(card.dataset.starter);
+          const card = e.target.closest("[data-starter-idx]");
+          if (card) triggerStarterPrompt(parseInt(card.dataset.starterIdx, 10));
         });
       }
       setupEventListeners();
       await checkAuthStatus();
+      await loadDynamicSuggestions();
     });
 
     // ========================================================================
@@ -1802,14 +1923,21 @@ export function getHTML(env = {}) {
       const badge = document.getElementById("guestQuotaBadge");
       const signInBtn = document.getElementById("topbarSignInBtn");
       const guestBanner = document.getElementById("authGuestBanner");
+      const pwInput = document.getElementById("masterPasswordInput");
       if (badge) badge.style.display = "none";
       if (signInBtn) signInBtn.style.display = "none";
       if (guestBanner) guestBanner.style.display = "none";
+      if (pwInput) {
+        pwInput.value = "";
+        pwInput.disabled = true;
+      }
       const signOutBtn = document.getElementById("signOutBtn");
       if (signOutBtn) signOutBtn.textContent = "Sign Out";
     }
 
     function showAuthModal(forced) {
+      const pwInput = document.getElementById("masterPasswordInput");
+      if (pwInput) pwInput.disabled = false;
       const sub = document.getElementById("authModalSubtitle");
       if (forced && guestRemaining <= 0) {
         sub.textContent = "You have used your 3 free guest queries today. Sign in to continue enjoying Mehkesh AI.";
@@ -1823,22 +1951,21 @@ export function getHTML(env = {}) {
     window.initGoogleSignIn = function() {
       if (!GOOGLE_CLIENT_ID || typeof google === "undefined" || !google.accounts || !google.accounts.id) return;
       try {
+        const container = document.getElementById("googleBtnContainer");
+        if (!container) return;
         google.accounts.id.initialize({
           client_id: GOOGLE_CLIENT_ID,
           callback: handleGoogleCredentialResponse,
           auto_select: false
         });
-        const container = document.getElementById("googleBtnContainer");
-        if (container) {
-          container.innerHTML = "";
-          google.accounts.id.renderButton(container, {
-            theme: "filled_blue",
-            size: "large",
-            shape: "pill",
-            width: 280,
-            text: "continue_with"
-          });
-        }
+        container.innerHTML = "";
+        google.accounts.id.renderButton(container, {
+          theme: "filled_blue",
+          size: "large",
+          shape: "pill",
+          width: 280,
+          text: "continue_with"
+        });
       } catch (e) {}
     };
 
@@ -1857,6 +1984,7 @@ export function getHTML(env = {}) {
           hideGuestUI();
           renderUserUI();
           loadSessions();
+          loadDynamicSuggestions();
           updateQuotaDisplay();
           closeModal("authModal");
           showToast("Welcome, " + currentUser.full_name, "success");
@@ -1893,6 +2021,7 @@ export function getHTML(env = {}) {
           hideGuestUI();
           renderUserUI();
           loadSessions();
+          loadDynamicSuggestions();
           updateQuotaDisplay();
           closeModal("authModal");
           showToast("Master Admin authenticated", "success");
@@ -1933,6 +2062,13 @@ export function getHTML(env = {}) {
 
       document.getElementById("settingsNameInput").value = currentUser.full_name || "Mehkesh";
       document.getElementById("settingsEmailInput").value = currentUser.email || "";
+
+      // Reveal Custom Instructions for signed-in users
+      const ciSection = document.getElementById("customInstructionsSection");
+      if (ciSection) {
+        ciSection.style.display = "block";
+        loadCustomInstructions();
+      }
 
       // Reveal Admin Console Tab if user is admin
       if (isAdmin) {
@@ -1977,7 +2113,19 @@ export function getHTML(env = {}) {
       document.getElementById("modelDropdownMenu").classList.toggle("active");
     }
 
-    function selectModel(modelKey, label) {
+    function toggleChatMoreMenu(e) {
+      if (e) e.stopPropagation();
+      const menu = document.getElementById("chatMoreMenu");
+      if (menu) menu.classList.toggle("active");
+    }
+
+    function closeChatMoreMenu() {
+      const menu = document.getElementById("chatMoreMenu");
+      if (menu) menu.classList.remove("active");
+    }
+
+    function selectModel(modelKey, label, e) {
+      if (e) e.stopPropagation();
       selectedModel = modelKey;
       document.getElementById("currentModelLabel").textContent = label;
       document.querySelectorAll(".model-dropdown-item").forEach(item => {
@@ -1992,6 +2140,10 @@ export function getHTML(env = {}) {
       if (pill && !pill.contains(e.target)) {
         const menu = document.getElementById("modelDropdownMenu");
         if (menu) menu.classList.remove("active");
+      }
+      const moreWrap = document.getElementById("chatMoreWrap");
+      if (moreWrap && !moreWrap.contains(e.target)) {
+        closeChatMoreMenu();
       }
     });
 
@@ -2148,44 +2300,61 @@ export function getHTML(env = {}) {
         '  <img src="/logo.png" alt="Mehkesh AI">',
         '</div>',
         '<h1 class="hero-title">What can I help you with today?</h1>',
-        '<div class="starter-cards-grid">',
-        '  <div class="starter-card" data-starter="code">',
-        '    <div class="starter-card-tag">Code Architecture</div>',
-        '    <div class="starter-card-desc">Build a serverless API with SQLite database</div>',
-        '  </div>',
-        '  <div class="starter-card" data-starter="reason">',
-        '    <div class="starter-card-tag">System Analysis</div>',
-        '    <div class="starter-card-desc">Compare latency trade-offs of edge vs centralized servers</div>',
-        '  </div>',
-        '  <div class="starter-card" data-starter="imagine">',
-        '    <div class="starter-card-tag">Create Image</div>',
-        '    <div class="starter-card-desc">/imagine photorealistic obsidian workstation with ambient violet lighting</div>',
-        '  </div>',
-        '  <div class="starter-card" data-starter="translate">',
-        '    <div class="starter-card-tag">Translate</div>',
-        '    <div class="starter-card-desc">/translate hin_Deva Translate technical docs into Hindi</div>',
-        '  </div>',
-        '</div>'
+        '<div class="starter-cards-grid" id="starterCardsGrid"></div>'
       ].join('');
       hero.addEventListener("click", (e) => {
-        const card = e.target.closest("[data-starter]");
-        if (card && card.dataset.starter) triggerStarterPrompt(card.dataset.starter);
+        const card = e.target.closest("[data-starter-idx]");
+        if (card) triggerStarterPrompt(parseInt(card.dataset.starterIdx, 10));
       });
       chatMaxWidth.appendChild(hero);
+      renderStarterCards();
     }
 
-    function triggerStarterPrompt(type) {
-      if (type === "code") {
-        selectModel("@cf/qwen/qwen2.5-coder-32b-instruct", "💻 Code & Tech");
-        sendMessage("Write an optimized Cloudflare Worker API with rate limiting and SQLite D1 caching.");
-      } else if (type === "reason") {
-        selectModel("@cf/meta/llama-3.3-70b-instruct-fp8-fast", "🧠 Deep Reasoning");
-        sendMessage("Compare edge serverless architecture vs containerized microservices. Detail trade-offs in cold-starts, latency, and operational cost.");
-      } else if (type === "imagine") {
-        sendMessage("/imagine A hyper-realistic obsidian workstation with subtle violet ambient backlighting, cinematic 8k");
-      } else if (type === "translate") {
-        sendMessage("/translate hin_Deva Good morning team! Today we are deploying our personal AI assistant globally.");
+    async function loadDynamicSuggestions() {
+      try {
+        const res = await fetch("/api/suggestions");
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.suggestions) && data.suggestions.length > 0) {
+            dynamicSuggestions = data.suggestions;
+            renderStarterCards();
+          }
+        }
+      } catch (e) {}
+    }
+
+    function renderStarterCards() {
+      const grid = document.querySelector(".starter-cards-grid");
+      if (!grid) return;
+      const list = dynamicSuggestions.length > 0 ? dynamicSuggestions : [
+        { tag: "Code Architecture", title: "Build a serverless API with SQLite database", prompt: "Write an optimized Cloudflare Worker API with rate limiting and SQLite D1 caching.", mode: "@cf/qwen/qwen3-30b-a3b-fp8", label: "💻 Code & Tech" },
+        { tag: "System Analysis", title: "Compare latency trade-offs of edge vs centralized servers", prompt: "Compare edge serverless architecture vs containerized microservices. Detail trade-offs in cold-starts, latency, and operational cost.", mode: "@cf/openai/gpt-oss-20b", label: "🧠 Deep Reasoning" },
+        { tag: "Create Image", title: "/imagine photorealistic obsidian workstation with ambient violet lighting", prompt: "/imagine photorealistic obsidian workstation with ambient violet lighting", mode: "auto", label: "⚡ Mehkesh Auto" },
+        { tag: "Translate", title: "/translate hin_Deva Translate technical docs into Hindi", prompt: "/translate hin_Deva Good morning team! Today we are deploying our personal AI assistant globally.", mode: "auto", label: "⚡ Mehkesh Auto" }
+      ];
+      grid.innerHTML = "";
+      list.forEach((item, idx) => {
+        const card = document.createElement("div");
+        card.className = "starter-card";
+        card.dataset.starterIdx = String(idx);
+        card.innerHTML = '<div class="starter-card-tag">' + escapeHtml(item.tag) + '</div><div class="starter-card-desc">' + escapeHtml(item.title) + '</div>';
+        grid.appendChild(card);
+      });
+    }
+
+    function triggerStarterPrompt(idx) {
+      const list = dynamicSuggestions.length > 0 ? dynamicSuggestions : [
+        { tag: "Code Architecture", title: "Build a serverless API with SQLite database", prompt: "Write an optimized Cloudflare Worker API with rate limiting and SQLite D1 caching.", mode: "@cf/qwen/qwen3-30b-a3b-fp8", label: "💻 Code & Tech" },
+        { tag: "System Analysis", title: "Compare latency trade-offs of edge vs centralized servers", prompt: "Compare edge serverless architecture vs containerized microservices. Detail trade-offs in cold-starts, latency, and operational cost.", mode: "@cf/openai/gpt-oss-20b", label: "🧠 Deep Reasoning" },
+        { tag: "Create Image", title: "/imagine photorealistic obsidian workstation with ambient violet lighting", prompt: "/imagine photorealistic obsidian workstation with ambient violet lighting", mode: "auto", label: "⚡ Mehkesh Auto" },
+        { tag: "Translate", title: "/translate hin_Deva Translate technical docs into Hindi", prompt: "/translate hin_Deva Good morning team! Today we are deploying our personal AI assistant globally.", mode: "auto", label: "⚡ Mehkesh Auto" }
+      ];
+      const item = list[idx];
+      if (!item) return;
+      if (item.mode && item.mode !== "auto" && !item.prompt.startsWith("/")) {
+        selectModel(item.mode, item.label || "⚡ Mehkesh Auto");
       }
+      sendMessage(item.prompt);
     }
 
     async function startInlineRename(sessionId) {
@@ -2197,23 +2366,38 @@ export function getHTML(env = {}) {
       input.value = currentTitle;
       input.style.cssText = "width:100%; background:var(--bg-input); border:1px solid var(--purple); color:var(--text-main); padding:2px 6px; border-radius:4px; font-size:0.8rem;";
 
-      input.onkeydown = async (e) => {
-        if (e.key === "Enter") {
-          const newTitle = input.value.trim() || currentTitle;
-          span.textContent = newTitle;
+      let finished = false;
+      const finishRename = async (save) => {
+        if (finished) return;
+        finished = true;
+        const newTitle = save ? (input.value.trim() || currentTitle) : currentTitle;
+        span.textContent = newTitle;
+        if (input.parentNode) {
           input.replaceWith(span);
-          await fetch("/api/sessions/" + sessionId, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ title: newTitle })
-          });
-          loadSessions();
-        } else if (e.key === "Escape") {
-          input.replaceWith(span);
+        }
+        if (save && newTitle !== currentTitle) {
+          try {
+            await fetch("/api/sessions/" + sessionId, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title: newTitle })
+            });
+            loadSessions();
+          } catch (e) {}
         }
       };
 
-      input.onblur = () => input.replaceWith(span);
+      input.onkeydown = (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          finishRename(true);
+        } else if (e.key === "Escape") {
+          e.preventDefault();
+          finishRename(false);
+        }
+      };
+
+      input.onblur = () => finishRename(true);
       span.replaceWith(input);
       input.focus();
       input.select();
@@ -2251,7 +2435,22 @@ export function getHTML(env = {}) {
     // ========================================================================
     // Message Rendering & Document Canvas
     // ========================================================================
-    function appendMessageDOM(role, contentText) {
+    function renderMarkdownWithThinking(rawText) {
+      let text = String(rawText || "");
+      let thinkHtml = "";
+      const thinkRegex = new RegExp("^<think>([\\s\\S]*?)<\\/think>\\s*", "i");
+      const thinkMatch = text.match(thinkRegex);
+      if (thinkMatch) {
+        thinkHtml = '<details class="thinking-block"><summary>🧠 Reasoning Process</summary><div class="thinking-block-content">' + escapeHtml(thinkMatch[1].trim()) + '</div></details>';
+        text = text.slice(thinkMatch[0].length);
+      } else if (text.startsWith("<think>")) {
+        const partial = text.slice(7);
+        return '<details class="thinking-block" open><summary>🧠 Thinking...</summary><div class="thinking-block-content">' + escapeHtml(partial) + '</div></details>';
+      }
+      return thinkHtml + DOMPurify.sanitize(marked.parse(text));
+    }
+
+    function appendMessageDOM(role, contentText, mediaItems = []) {
       const hero = document.getElementById("emptyHero");
       if (hero) hero.remove();
 
@@ -2262,7 +2461,29 @@ export function getHTML(env = {}) {
       if (role === "user") {
         const bubble = document.createElement("div");
         bubble.className = "user-bubble";
-        bubble.textContent = contentText;
+
+        if (Array.isArray(mediaItems) && mediaItems.length > 0) {
+          const thumbs = document.createElement("div");
+          thumbs.className = "user-attachment-thumbs";
+          mediaItems.forEach(item => {
+            if (item.dataUrl) {
+              const img = document.createElement("img");
+              img.src = item.dataUrl;
+              img.alt = item.name || "Uploaded image";
+              thumbs.appendChild(img);
+            } else if (item.name) {
+              const badge = document.createElement("span");
+              badge.className = "user-attachment-badge";
+              badge.textContent = "📄 " + item.name;
+              thumbs.appendChild(badge);
+            }
+          });
+          bubble.appendChild(thumbs);
+        }
+
+        const textNode = document.createElement("div");
+        textNode.textContent = contentText;
+        bubble.appendChild(textNode);
 
         const editBtn = document.createElement("button");
         editBtn.className = "user-edit-btn";
@@ -2284,7 +2505,7 @@ export function getHTML(env = {}) {
 
         const body = document.createElement("div");
         body.className = "assistant-body";
-        body.innerHTML = DOMPurify.sanitize(marked.parse(contentText));
+        body.innerHTML = renderMarkdownWithThinking(contentText);
         wrapTables(body);
         enhanceCodeBlocks(body);
         enhanceImages(body);
@@ -2522,8 +2743,7 @@ export function getHTML(env = {}) {
               chatMaxWidth.lastElementChild.remove();
             }
           }
-          currentMessages.pop();
-          sendMessage(userPrompt);
+          sendMessage(userPrompt, { isRegenerate: true });
           break;
         }
       }
@@ -2537,23 +2757,39 @@ export function getHTML(env = {}) {
     // ========================================================================
     // Chat Submission & Streaming Engine
     // ========================================================================
-    async function sendMessage(overrideText) {
+    async function sendMessage(overrideText, options = {}) {
+      const isRegenerate = Boolean(options && options.isRegenerate);
       if (isGuest && guestRemaining <= 0) {
         showToast("You have used your 3 free guest queries for today. Please sign in to continue.", "warning");
         showAuthModal(true);
         return;
       }
       let prompt = overrideText || document.getElementById("chatInput").value.trim();
+      if (!prompt && (attachedImages.length > 0 || attachedDocuments.length > 0)) {
+        prompt = attachedImages.length > 0 ? "Analyze and summarize this image." : "Summarize the attached document(s).";
+      }
       if (!prompt || isGenerating) return;
 
       document.getElementById("chatInput").value = "";
       document.getElementById("chatInput").style.height = "auto";
       hideSlash();
 
-      // If document attached, embed it in code fence
-      if (attachedDocument) {
+      if (prompt.trim() === "/clear") {
+        startNewChat();
+        removeAttachment();
+        return;
+      }
+
+      const currentImages = attachedImages.slice();
+      const currentDocs = attachedDocuments.slice();
+
+      // Embed any attached text/PDF documents into the prompt
+      if (!isRegenerate && currentDocs.length > 0) {
         const fence = String.fromCharCode(96, 96, 96);
-        prompt = prompt + "\\n\\n--- Attached File: " + attachedDocument.name + " ---\\n" + fence + (attachedDocument.ext || "") + "\\n" + attachedDocument.content + "\\n" + fence + "\\n---";
+        const docBlocks = currentDocs.map(doc =>
+          "\\n\\n--- Attached File: " + doc.name + " ---\\n" + fence + (doc.ext || "") + "\\n" + doc.content + "\\n" + fence + "\\n---"
+        ).join("");
+        prompt = prompt + docBlocks;
       }
 
       if (!currentSessionId && !isGuest) {
@@ -2575,21 +2811,27 @@ export function getHTML(env = {}) {
         } catch (e) {}
       }
 
-      appendMessageDOM("user", prompt);
-      currentMessages.push({ role: "user", content: prompt });
+      if (!isRegenerate) {
+        const mediaThumbs = [
+          ...currentImages.map(img => ({ name: img.name, dataUrl: img.dataUrl })),
+          ...currentDocs.map(doc => ({ name: doc.name }))
+        ];
+        appendMessageDOM("user", overrideText || prompt, mediaThumbs);
+        currentMessages.push({ role: "user", content: prompt });
+      }
 
       if (prompt.startsWith("/imagine ")) {
         handleFluxGeneration(prompt.slice(9).trim());
         removeAttachment();
         return;
       }
-      if (prompt.startsWith("/translate ")) {
-        handleIndicTranslation(prompt.slice(11).trim());
+      if (selectedModel === "@cf/black-forest-labs/flux-1-schnell" && !prompt.startsWith("/") && currentImages.length === 0) {
+        handleFluxGeneration(prompt);
         removeAttachment();
         return;
       }
-      if (prompt.startsWith("/clear")) {
-        startNewChat();
+      if (prompt.startsWith("/translate ")) {
+        handleIndicTranslation(prompt.slice(11).trim());
         removeAttachment();
         return;
       }
@@ -2626,14 +2868,17 @@ export function getHTML(env = {}) {
       let accumulatedText = "";
 
       try {
+        const imageUrls = currentImages.map(i => i.dataUrl);
         const payload = {
           messages: currentMessages,
           session_id: currentSessionId,
           model: selectedModel,
           model_override: selectedModel,
-          image: attachedImageData,
-          image_data: attachedImageData,
-          has_image: Boolean(attachedImageData)
+          image: imageUrls[0] || null,
+          image_data: imageUrls[0] || null,
+          images: imageUrls,
+          has_image: imageUrls.length > 0,
+          is_regenerate: isRegenerate
         };
 
         const res = await fetch("/api/chat", {
@@ -2686,9 +2931,10 @@ export function getHTML(env = {}) {
 
             try {
               const parsed = JSON.parse(dataStr);
-              if (parsed.response) {
-                accumulatedText += parsed.response;
-                body.innerHTML = DOMPurify.sanitize(marked.parse(accumulatedText));
+              const token = parsed.response !== undefined ? parsed.response : (parsed.choices && parsed.choices[0] && parsed.choices[0].delta ? parsed.choices[0].delta.content : undefined);
+              if (token !== undefined && token !== null && token !== "") {
+                accumulatedText += String(token);
+                body.innerHTML = renderMarkdownWithThinking(accumulatedText);
                 wrapTables(body);
                 scrollToBottom();
               }
@@ -2697,7 +2943,7 @@ export function getHTML(env = {}) {
         }
 
         if (accumulatedText) {
-          body.innerHTML = DOMPurify.sanitize(marked.parse(accumulatedText));
+          body.innerHTML = renderMarkdownWithThinking(accumulatedText);
           wrapTables(body);
           enhanceCodeBlocks(body);
           enhanceImages(body);
@@ -2927,11 +3173,17 @@ export function getHTML(env = {}) {
           e.preventDefault();
           toggleSidebar();
         }
+        if (e.key === "Escape") {
+          ["briefingModal", "memoryModal", "settingsModal", "authModal"].forEach(id => {
+            const m = document.getElementById(id);
+            if (m && m.style.display === "flex") closeModal(id);
+          });
+        }
       });
 
       document.getElementById("fileInput").addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        if (file) handleIncomingFile(file);
+        const files = Array.from(e.target.files || []);
+        files.forEach(file => handleIncomingFile(file));
       });
 
       window.addEventListener("paste", (e) => {
@@ -2996,23 +3248,71 @@ export function getHTML(env = {}) {
       });
     }
 
-    function handleIncomingFile(file) {
+    async function handleIncomingFile(file) {
       if (!file) return;
 
-      // Handle Image Files
+      // 1. Handle Image Files (supports up to 4 images)
       if (file.type.startsWith("image/")) {
+        if (attachedImages.length >= 4) {
+          showToast("Maximum 4 images per message", "warning");
+          return;
+        }
         const reader = new FileReader();
         reader.onload = (e) => {
-          attachedImageData = e.target.result;
-          attachedDocument = null;
-          renderAttachmentUI(file.name || "Screenshot", true, e.target.result);
+          attachedImages.push({ name: file.name || "Screenshot", dataUrl: e.target.result });
+          renderAttachmentUI();
           showToast("Image attached", "info");
         };
         reader.readAsDataURL(file);
         return;
       }
 
-      // Handle Code & Text Files
+      // 2. Handle PDF Files via PDF.js text extraction
+      const isPdf = file.type === "application/pdf" || (file.name && file.name.toLowerCase().endsWith(".pdf"));
+      if (isPdf) {
+        if (file.size > 10 * 1024 * 1024) {
+          showToast("PDF files limited to 10MB", "warning");
+          return;
+        }
+        if (!window.pdfjsLib) {
+          showToast("PDF parser still loading, please try again", "warning");
+          return;
+        }
+        try {
+          showToast("Extracting PDF text...", "info");
+          const arrayBuffer = await file.arrayBuffer();
+          const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          let fullText = "";
+          const maxPages = Math.min(pdf.numPages, 30);
+          for (let p = 1; p <= maxPages; p++) {
+            const page = await pdf.getPage(p);
+            const textContent = await page.getTextContent();
+            const pageStr = textContent.items.map(it => it.str).join(" ").trim();
+            if (pageStr) fullText += "[Page " + p + "]\\n" + pageStr + "\\n\\n";
+          }
+          fullText = fullText.trim();
+          if (!fullText) {
+            showToast("No selectable text found in PDF (scanned PDFs can be uploaded as screenshots)", "warning");
+            return;
+          }
+          if (fullText.length > 20000) {
+            fullText = fullText.slice(0, 20000) + "\\n...[truncated for edge context limit]";
+          }
+          attachedDocuments.push({
+            name: file.name + " (" + pdf.numPages + "p)",
+            content: fullText,
+            size: file.size,
+            ext: "txt"
+          });
+          renderAttachmentUI();
+          showToast("PDF extracted (" + pdf.numPages + " pages)", "success");
+        } catch (pdfErr) {
+          showToast("Failed to read PDF: " + (pdfErr.message || "Invalid PDF"), "error");
+        }
+        return;
+      }
+
+      // 3. Handle Code & Text Files
       if (file.size > 1024 * 1024) {
         showToast("Text files limited to 1MB", "info");
         return;
@@ -3020,57 +3320,80 @@ export function getHTML(env = {}) {
 
       const reader = new FileReader();
       reader.onload = (e) => {
-        const ext = file.name.split(".").pop() || "txt";
-        attachedDocument = {
+        const ext = (file.name && file.name.split(".").pop()) || "txt";
+        attachedDocuments.push({
           name: file.name,
-          content: e.target.result,
+          content: String(e.target.result || "").slice(0, 20000),
           size: file.size,
           ext: ext
-        };
-        attachedImageData = null;
-        renderAttachmentUI(file.name, false);
+        });
+        renderAttachmentUI();
         showToast("Document attached", "info");
       };
       reader.readAsText(file);
     }
 
-    function renderAttachmentUI(fileName, isImage, thumbSrc) {
+    function renderAttachmentUI() {
       const container = document.getElementById("attachmentPreviewContainer");
       container.innerHTML = "";
+      if (attachedImages.length === 0 && attachedDocuments.length === 0) {
+        container.style.display = "none";
+        return;
+      }
       container.style.display = "flex";
 
-      const card = document.createElement("div");
-      card.className = "attachment-card";
-
-      if (isImage && thumbSrc) {
+      attachedImages.forEach((imgItem, idx) => {
+        const card = document.createElement("div");
+        card.className = "attachment-card";
         const img = document.createElement("img");
         img.className = "attachment-thumb";
-        img.src = thumbSrc;
+        img.src = imgItem.dataUrl;
         card.appendChild(img);
-      } else {
+
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "attachment-name";
+        nameSpan.textContent = imgItem.name;
+        card.appendChild(nameSpan);
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "chip-remove-btn";
+        delBtn.textContent = "✕";
+        delBtn.onclick = () => {
+          attachedImages.splice(idx, 1);
+          renderAttachmentUI();
+        };
+        card.appendChild(delBtn);
+        container.appendChild(card);
+      });
+
+      attachedDocuments.forEach((docItem, idx) => {
+        const card = document.createElement("div");
+        card.className = "attachment-card";
         const icon = document.createElement("span");
         icon.className = "attachment-doc-icon";
         icon.textContent = "📄";
         card.appendChild(icon);
-      }
 
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "attachment-name";
-      nameSpan.textContent = fileName;
-      card.appendChild(nameSpan);
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "attachment-name";
+        nameSpan.textContent = docItem.name;
+        card.appendChild(nameSpan);
 
-      const delBtn = document.createElement("button");
-      delBtn.className = "chip-remove-btn";
-      delBtn.textContent = "✕";
-      delBtn.onclick = removeAttachment;
-      card.appendChild(delBtn);
-
-      container.appendChild(card);
+        const delBtn = document.createElement("button");
+        delBtn.className = "chip-remove-btn";
+        delBtn.textContent = "✕";
+        delBtn.onclick = () => {
+          attachedDocuments.splice(idx, 1);
+          renderAttachmentUI();
+        };
+        card.appendChild(delBtn);
+        container.appendChild(card);
+      });
     }
 
     function removeAttachment() {
-      attachedImageData = null;
-      attachedDocument = null;
+      attachedImages = [];
+      attachedDocuments = [];
       const container = document.getElementById("attachmentPreviewContainer");
       if (container) {
         container.innerHTML = "";
@@ -3080,9 +3403,14 @@ export function getHTML(env = {}) {
     }
 
     function applySlash(cmd) {
+      hideSlash();
+      if (cmd === "/clear") {
+        document.getElementById("chatInput").value = "";
+        startNewChat();
+        return;
+      }
       document.getElementById("chatInput").value = cmd;
       document.getElementById("chatInput").focus();
-      hideSlash();
     }
 
     function hideSlash() {
@@ -3094,11 +3422,21 @@ export function getHTML(env = {}) {
     // Daily Briefing
     // ========================================================================
     async function showDailyBriefing() {
+      if (isGuest) {
+        showToast("Sign in to view your personalized Daily Briefing", "info");
+        showAuthModal(false);
+        return;
+      }
       openModal("briefingModal");
       const content = document.getElementById("briefingContent");
       content.innerHTML = '<p style="color:var(--text-muted);">Loading your daily briefing...</p>';
       try {
         const res = await fetch("/api/briefing/today");
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          content.innerHTML = '<p style="color:var(--red);">' + escapeHtml(err.error || "Sign in required to load briefing.") + '</p>';
+          return;
+        }
         const data = await res.json();
         if (data && data.summary) {
           content.innerHTML = DOMPurify.sanitize(marked.parse(data.summary));
@@ -3112,11 +3450,20 @@ export function getHTML(env = {}) {
     }
 
     async function refreshBriefing() {
+      if (isGuest) {
+        showToast("Sign in to refresh Daily Briefing", "info");
+        showAuthModal(false);
+        return;
+      }
       const content = document.getElementById("briefingContent");
       content.innerHTML = '<p style="color:var(--text-muted);">Generating your briefing with AI...</p>';
       try {
         const res = await fetch("/api/briefing/refresh", { method: "POST" });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          content.innerHTML = '<p style="color:var(--red);">' + escapeHtml(data.error || "Failed to refresh briefing.") + '</p>';
+          return;
+        }
         const summary = (data.briefing && data.briefing.summary) || data.summary;
         if (summary) {
           content.innerHTML = DOMPurify.sanitize(marked.parse(summary));
@@ -3134,8 +3481,15 @@ export function getHTML(env = {}) {
     // Memories
     // ========================================================================
     async function loadMemories() {
+      if (isGuest) {
+        closeModal("memoryModal");
+        showToast("Sign in to access Assistant Memories", "info");
+        showAuthModal(false);
+        return;
+      }
       try {
         const res = await fetch("/api/memories");
+        if (!res.ok) return;
         const list = await res.json();
         const container = document.getElementById("memoryListContainer");
         container.innerHTML = "";
@@ -3339,6 +3693,61 @@ export function getHTML(env = {}) {
       toast.textContent = msg;
       container.appendChild(toast);
       setTimeout(() => toast.remove(), 3000);
+    }
+
+    function exportChatAsPDF() {
+      if (!currentMessages || currentMessages.length === 0) {
+        showToast("No messages to export", "info");
+        return;
+      }
+      window.print();
+    }
+
+    function exportCurrentChat() {
+      if (!currentMessages || currentMessages.length === 0) {
+        showToast("No messages to export", "info");
+        return;
+      }
+      const md = currentMessages.map(m => "### " + (m.role === "user" ? "You" : "Mehkesh AI") + "\\n\\n" + m.content).join("\\n\\n---\\n\\n");
+      const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "mehkesh-ai-chat-" + Date.now() + ".md";
+      a.click();
+      showToast("Chat exported as Markdown", "success");
+    }
+
+    async function loadCustomInstructions() {
+      if (isGuest) return;
+      try {
+        const res = await fetch("/api/profile");
+        if (res.ok) {
+          const data = await res.json();
+          const input = document.getElementById("customInstructionsInput");
+          if (input && typeof data.custom_instructions === "string") {
+            input.value = data.custom_instructions;
+          }
+        }
+      } catch (e) {}
+    }
+
+    async function saveCustomInstructions() {
+      const input = document.getElementById("customInstructionsInput");
+      if (!input) return;
+      try {
+        const res = await fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ custom_instructions: input.value.trim() })
+        });
+        if (res.ok) {
+          showToast("Custom instructions saved", "success");
+        } else {
+          showToast("Failed to save instructions", "error");
+        }
+      } catch (e) {
+        showToast("Error saving instructions", "error");
+      }
     }
 
     function escapeHtml(str) {

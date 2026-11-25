@@ -7,12 +7,14 @@ test('Mehkesh AI UI - HTML generation & client syntax verification', (t) => {
   const html = getHTML({ GOOGLE_CLIENT_ID: 'test_client_id', APP_NAME: 'Mehkesh AI' });
   assert.ok(html.length > 50000, 'HTML output should be complete');
 
-  // Verify client-side script parses without syntax error
-  const scriptMatch = html.match(/<script>([\s\S]*?)<\/script>/);
-  assert.ok(scriptMatch, 'Should contain embedded client script');
-  assert.doesNotThrow(() => {
-    new vm.Script(scriptMatch[1]);
-  }, 'Client script should be valid JavaScript');
+  // Verify ALL inline client-side scripts parse without syntax error
+  const scriptMatches = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+  assert.ok(scriptMatches.length >= 2, 'Should contain embedded client scripts');
+  scriptMatches.forEach((m, idx) => {
+    assert.doesNotThrow(() => {
+      new vm.Script(m[1]);
+    }, `Client script #${idx + 1} should be valid JavaScript`);
+  });
 
   // Verify human-centric model choices
   assert.ok(html.includes('⚡ Mehkesh Auto'), 'Should have Mehkesh Auto');
@@ -64,9 +66,18 @@ test('Mehkesh AI UI - HTML generation & client syntax verification', (t) => {
   assert.ok(html.includes('toggleTTS'), 'Should provide TTS listen/stop toggling');
   assert.ok(html.includes('toggleMicRecording'), 'Should provide voice recording via Whisper AI');
 
-  // Verify Expanded File & Code Attachments
-  assert.ok(html.includes('accept="image/*,.txt,.py,.js'), 'Should support code, data, and image attachments');
+  // Verify Expanded File & Code Attachments (including PDF.js)
+  assert.ok(html.includes('accept="image/*,.pdf,.txt,.py,.js'), 'Should support PDF, code, data, and image attachments');
+  assert.ok(html.includes('pdf.min.js'), 'Should load PDF.js for client-side PDF text extraction');
   assert.ok(html.includes('attachment-preview-container'), 'Should provide attachment preview dock');
+
+  // Verify Dynamic Suggestions, Export, Custom Instructions & Bug Fixes
+  assert.ok(html.includes('loadDynamicSuggestions'), 'Should load dynamic history-based suggestions');
+  assert.ok(html.includes('/api/suggestions'), 'Should fetch suggestions from /api/suggestions');
+  assert.ok(html.includes('exportCurrentChat'), 'Should include Markdown chat export');
+  assert.ok(html.includes('customInstructionsInput'), 'Should include per-user custom instructions');
+  assert.ok(html.includes('isRegenerate'), 'Should prevent duplicate user messages on regenerate');
+  assert.ok(html.includes('e.stopPropagation()'), 'Should stop click propagation in model dropdown');
 
   // Verify Slash Command Engine
   assert.ok(html.includes('ArrowDown'), 'Should support keyboard navigation in slash commands');

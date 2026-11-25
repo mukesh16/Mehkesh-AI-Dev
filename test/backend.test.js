@@ -84,3 +84,97 @@ test('Mehkesh AI Edge Worker - Logout Header & Cookie Invalidation', async (t) =
   assert.ok(setCookie.includes('auth_password='), 'Should clear auth_password');
   assert.ok(setCookie.includes('Max-Age=0'), 'Should expire cookies immediately');
 });
+
+test('Mehkesh AI Edge Worker - Dynamic Suggestions Route for Guest', async (t) => {
+  const req = new Request('https://ai-dev.mehkesh.com/api/suggestions', {
+    method: 'GET',
+    headers: { 'CF-Connecting-IP': '1.2.3.4' }
+  });
+  const res = await worker.fetch(req, {}, { waitUntil: () => {} });
+  assert.strictEqual(res.status, 200);
+  const data = await res.json();
+  assert.ok(Array.isArray(data.suggestions) && data.suggestions.length === 4, 'Should return 4 starter suggestions');
+});
+
+test('Mehkesh AI Edge Worker - Multimodal Vision Payload Format (Llama 4 Scout image_url)', async (t) => {
+  let capturedModel = null;
+  let capturedInput = null;
+  const encoder = new TextEncoder();
+  const mockStream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode('data: {"response":"Infographic summary"}\n\n'));
+      controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+      controller.close();
+    }
+  });
+
+  const env = {
+    MASTER_PASSWORD: 'password@1911',
+    AI: {
+      run: async (model, input) => {
+        capturedModel = model;
+        capturedInput = input;
+        return mockStream;
+      }
+    }
+  };
+
+  const req = new Request('https://ai-dev.mehkesh.com/api/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-auth-password': 'password@1911'
+    },
+    body: JSON.stringify({
+      messages: [{ role: 'user', content: 'Summarize this image' }],
+      image_data: 'data:image/png;base64,iVBORw0KGgo=',
+      has_image: true
+    })
+  });
+
+  const res = await worker.fetch(req, env, { waitUntil: () => {} });
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(capturedModel, '@cf/meta/llama-4-scout-17b-16e-instruct');
+  assert.strictEqual(capturedInput.image, undefined, 'Should NOT pass legacy top-level image byte array');
+  const lastMsg = capturedInput.messages[capturedInput.messages.length - 1];
+  assert.ok(Array.isArray(lastMsg.content), 'User message content should be multimodal array');
+  assert.strictEqual(lastMsg.content[0].type, 'text');
+  assert.strictEqual(lastMsg.content[1].type, 'image_url');
+  assert.strictEqual(lastMsg.content[1].image_url.url, 'data:image/png;base64,iVBORw0KGgo=');
+});
+
+test('Mehkesh AI Edge Worker - Smart Model Routing Uses Updated 2026 Models', async (t) => {
+  const modelsUsed = [];
+  const encoder = new TextEncoder();
+  const env = {
+    MASTER_PASSWORD: 'password@1911',
+    AI: {
+      run: async (model) => {
+        modelsUsed.push(model);
+        return new ReadableStream({
+          start(c) {
+            c.enqueue(encoder.encode('data: {"response":"0"}\n\n'));
+            c.enqueue(encoder.encode('data: [DONE]\n\n'));
+            c.close();
+          }
+        });
+      }
+    }
+  };
+
+  const codeReq = new Request('https://ai-dev.mehkesh.com/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-auth-password': 'password@1911' },
+    body: JSON.stringify({ messages: [{ role: 'user', content: 'Write a javascript function to sort an array' }] })
+  });
+  const codeRes = await worker.fetch(codeReq, env, { waitUntil: () => {} });
+  assert.strictEqual(codeRes.headers.get('X-Model-Used'), '@cf/qwen/qwen3-30b-a3b-fp8');
+
+  const reasonReq = new Request('https://ai-dev.mehkesh.com/api/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-auth-password': 'password@1911' },
+    body: JSON.stringify({ messages: [{ role: 'user', content: 'Do a deep analysis step-by-step of this theorem' }] })
+  });
+  const reasonRes = await worker.fetch(reasonReq, env, { waitUntil: () => {} });
+  assert.strictEqual(reasonRes.headers.get('X-Model-Used'), '@cf/openai/gpt-oss-20b');
+});
